@@ -1,0 +1,6 @@
+#myPatho1
+EPHA8
+SPEN
+#myPatho2
+HTR6
+H6PD
