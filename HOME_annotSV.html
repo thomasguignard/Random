@@ -26,15 +26,33 @@ $(document).ready(function () {
                                                  
 				$( 'input', this ).on( 'keyup change', function () {
 					var expr = this.value;
-					$.fn.dataTableExt.afnFiltering.length = 0;
-					if(expr.length > 0){
-						filterByExp(i, expr);  
-					}else{
-						$.fn.dataTableExt.afnFiltering.length = 0;
+					if(expr.length === 0){
+						console.log($.fn.dataTableExt.afnFiltering);
+						$.fn.dataTableExt.afnFiltering.pop();
+                    	table.draw();                  		
+						return;
 					}
-				/*	console.log("col0    :  "+i);
-					console.log("expr0   :  "+expr);*/
-					table.draw();	  
+
+
+					if (/ OR | AND |NOT |[<>]/i.test(expr)){
+						console.log("expr0   :  "+expr);
+	
+						$.fn.dataTableExt.afnFiltering.pop();
+						if(expr.length > 0){
+							filterByExp(i, expr);  
+						}
+
+						table.draw();	  
+
+					}else{
+	
+				  		if ( table.column(i).search() !== this.value ) {
+                    	    table
+                    	   .column(i)
+                    	   .search( this.value )
+                    	   .draw();
+                  		}
+					}
 				} );
 
 			} );
@@ -65,8 +83,8 @@ $(document).ready(function () {
 var filterByExp = function(column,request){
 	
 	var expr = request; 	
-	/*console.log("expr   : "+expr);
-	console.log("col   : "+column);
+	console.log("expr   : "+expr);
+	/*console.log("col   : "+column);
 	console.log("expr1   : "+expr);*/
 
 	$.fn.dataTableExt.afnFiltering.push(
@@ -76,14 +94,20 @@ var filterByExp = function(column,request){
 			var colIdx = column; 
 			var exprRequest = expr;
 			var row_data = aData[column];
-			/*console.log("rowdata   : "+row_data);
-			console.log("exprRequest   : "+exprRequest);*/
-			if (exprRequest.match(/\w+ OR \w+/gi)) {
-				var valOR = filter.match(/(\w+) OR (\w+)/gi);
+			/*console.log("rowdata   : "+row_data);*/
+			console.log("exprRequest   : "+exprRequest);
+			if (exprRequest.match(/\w+\s+OR\s+\w+/gi)) {
+				var valOR = exprRequest.match(/(\w+)\s+OR\s+(\w+)/gi);
+				console.log("exprRequest1   : "+exprRequest);
+				console.log("valor[0]   : "+valOR[0]);
+				console.log("valor[1]   : "+valOR[1]);
+				console.log("valor[2]   : "+valOR[2]);
+				console.log("valor[3]   : "+valOR[3]);
+
 				return (row_data === valOR[1] || row_data === valOR[2]) ? true : false;
 			}
 			if (exprRequest.match(/\w+ AND \w+/gi)) {
-				var valOR = filter.match(/(\w+) AND (\w+)/gi);
+				var valOR = exprRequest.match(/(\w+) AND (\w+)/gi);
 				return (row_data === valOR[1] && row_data === valOR[2]) ? true : false;
 			}
 
@@ -117,7 +141,8 @@ var filterByExp = function(column,request){
 				var num2 = exprClean.match(/\d+$/);
 				return (row_data >= num1 && row_data <= num2) ? true : false;
 			}
-			return true;
+			/*return true;*/
+			return false;
 		});
 }
 
@@ -456,9 +481,9 @@ function openCity(evt, cityName) {
 	<th >AnnotSV ranking	</th>
 	<th >SV type	</th>
 	<th >AnnotSV type	</th>
-	<th class="tooltip" >Some Genes<span class="tooltiptext tooltip-bottom">Provided by OMIM</span> 	</th>
-	<th class="tooltip" >Location Genes<span class="tooltiptext tooltip-bottom">Provided by OMIM</span> 	</th>
-	<th class="tooltip" >Morbid Genes<span class="tooltiptext tooltip-bottom">Provided by OMIM</span> 	</th>
+	<th class="tooltipHeader" >Some Genes<span class="tooltiptext tooltip-bottom">Provided by OMIM</span> 	</th>
+	<th class="tooltipHeader" >Location Genes<span class="tooltiptext tooltip-bottom">Provided by OMIM</span> 	</th>
+	<th class="tooltipHeader" >Morbid Genes<span class="tooltiptext tooltip-bottom">Provided by OMIM</span> 	</th>
 	<th >EXOMISER_GENE_PHENO_SCORE	</th>
 	<th >dbVar_status	</th>
 	<th >DGV_GAIN_Frequency	</th>
