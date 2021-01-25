@@ -544,7 +544,7 @@ while( <VCF> ){
 				$tempString = "";
 				@OMIM_ID_array = split(/; /, $dataHash{"OMIM_ID"} );
 				for( my $ID = 0 ; $ID < scalar @OMIM_ID_array; $ID++){
-					$tempString .=    "<a href=\"https://www.omim.org/entry/".$OMIM_ID_array[$ID]."\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color:#00FFFF\">".$OMIM_ID_array[$ID]."; </a>";
+					$tempString .=    "<a href=\"https://www.omim.org/entry/".$OMIM_ID_array[$ID]."\" target=\"_blank\" rel=\"noopener noreferrer\" >".$OMIM_ID_array[$ID]."; </a>";
 					if($ID < 5){
 						$OMIM_ID_link_string .= "<a href=\"https://www.omim.org/entry/".$OMIM_ID_array[$ID]."\" target=\"_blank\" rel=\"noopener noreferrer\" >".$OMIM_ID_array[$ID]."; </a>";
 					}
@@ -560,7 +560,7 @@ while( <VCF> ){
 				if(@OMIM_phen_array){
 					for ( my $ID = 0 ; $ID < scalar @OMIM_phen_array ; $ID++){
 						if( $OMIM_phen_array[$ID] =~ m/^(.+?)(\d{6})(.+?)$/){
-							$tempString .=   $1."<a href=\"https://www.omim.org/entry/".$2."\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color:#00FFFF\">".$2."</a>".$3.";<br>";   	
+							$tempString .=   $1."<a href=\"https://www.omim.org/entry/".$2."\" target=\"_blank\" rel=\"noopener noreferrer\" >".$2."</a>".$3.";<br>";   	
 						
 							#DEBUG TODO not sure
 							if ( $ID == 0 ){
@@ -600,7 +600,7 @@ while( <VCF> ){
 				@GeneName_array = split(/; /, $dataHash{"Gene_name"} );
 				for( my $ID = 0 ; $ID < scalar @GeneName_array; $ID++){
 					$GeneName_hash{$GeneName_array[$ID]} = 1;
-					$tempString .=    "<a href=\"https://www.genecards.org/cgi-bin/carddisp.pl?gene=".$GeneName_array[$ID]."\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color:#00FFFF\">".$GeneName_array[$ID]."; </a>";
+					$tempString .=    "<a href=\"https://www.genecards.org/cgi-bin/carddisp.pl?gene=".$GeneName_array[$ID]."\" target=\"_blank\" rel=\"noopener noreferrer\">".$GeneName_array[$ID]."; </a>";
 					if($ID < 5){
 						$GeneName_link_string .= "<a href=\"https://www.genecards.org/cgi-bin/carddisp.pl?gene=".$GeneName_array[$ID]."\" target=\"_blank\" rel=\"noopener noreferrer\" >".$GeneName_array[$ID]."</a>; ";
 					}
@@ -1036,12 +1036,46 @@ my $htmlStart = "<!DOCTYPE html>\n<html>
 \n<link rel=\"stylesheet\" href=\"/home/puce/PROJECTS/SlickGrid/css/smoothness/jquery-ui.css\" type=\"text/css\"/>
 \n<link rel=\"stylesheet\" href=\"/home/puce/PROJECTS/SlickGrid/examples/examples.css\" type=\"text/css\"/>
 
+\n<style>
+\n.loeufbin0{
+\n\tcolor: ".$LOEUF_ColorHash{'0.0'}."	
+\n}
+\n.loeufbin1{
+\n\tcolor: ".$LOEUF_ColorHash{'1.0'}."	
+\n}
+\n.loeufbin2{
+\n\tcolor: ".$LOEUF_ColorHash{'2.0'}."	
+\n}
+\n.loeufbin3{
+\n\tcolor: ".$LOEUF_ColorHash{'3.0'}."	
+\n}
+\n.loeufbin4{
+\n\tcolor: ".$LOEUF_ColorHash{'4.0'}."	
+\n}
+\n.loeufbin5{
+\n\tcolor: ".$LOEUF_ColorHash{'5.0'}."	
+\n}
+\n.loeufbin6{
+\n\tcolor: ".$LOEUF_ColorHash{'6.0'}."	
+\n}
+\n.loeufbin7{
+\n\tcolor: ".$LOEUF_ColorHash{'7.0'}."	
+\n}
+\n.loeufbin8{
+\n\tcolor: ".$LOEUF_ColorHash{'8.0'}."	
+\n}
+\n.loeufbin9{
+\n\tbackground-color: ".$LOEUF_ColorHash{'9.0'}.";	
+\n}
+\n</style>
+
+
 \n</head>
 \n<body>
 \n<table width=\"100%\">
 \n  <tr>
-\n   <td valign=\"top\" width=\"50%\">
-\n    <div id=\"myGrid\" style=\"width:600px;height:500px;\"></div>
+\n   <td valign=\"top\" width=\"80%\">
+\n    <div id=\"myGrid\" style=\"width:1000px;height:700px;\"></div>
 \n    </td>
 \n    <td valign=\"top\">
 \n      <h2>Demonstrates:</h2>
@@ -1064,18 +1098,27 @@ my $htmlStart = "<!DOCTYPE html>\n<html>
 \n<script src=\"/home/puce/PROJECTS/SlickGrid/slick.grid.js\"></script>
 
 \n<script>
-  var grid;
-  var columns = [";
+
+	function formatter(row, cell, value, columnDef, dataContext) {
+		return value;
+	}
+	function GeneNameFormatter(row, cell, value, columnDef, dataContext) {
+		return \"<span style='color:\"+ dataContext[LOEUF_color]+\"'>\" + value + \"</span>\";
+	}
+
+
+	var grid;
+	var columns = [";
 
 
 foreach my $col (sort {$a <=> $b} keys %OutColHash){
 			#print HTML "\t<th style=\"word-wrap: break-word\"   >";
 	print "colNbr:   ".$col."\t".$OutColHash{$col}{'field'}."\n";  
 	if (defined $OutColHash{$col}{'field'} && $col != 0){
-		if (defined $OutColHash{$col}{'HEADERTIPS'}){
-			$htmlStart .= "{id: \"".$OutColHash{$col}{'field'}."\", name: \"".$OutColHash{$col}{'RENAME'}."\", field: \"".$OutColHash{$col}{'field'}."\"},\n";
+		if (defined $OutColHash{$col}{'field'} && $OutColHash{$col}{'field'} eq "Gene_name"){
+			$htmlStart .= "{id: \"".$OutColHash{$col}{'field'}."\", name: \"".$OutColHash{$col}{'RENAME'}."\", field: \"".$OutColHash{$col}{'field'}."\", formatter: GeneNameFormatter},\n";
 		}else{
-			$htmlStart .= "{id: \"".$OutColHash{$col}{'field'}."\", name: \"".$OutColHash{$col}{'RENAME'}."\", field: \"".$OutColHash{$col}{'field'}."\"},\n";	
+			$htmlStart .= "{id: \"".$OutColHash{$col}{'field'}."\", name: \"".$OutColHash{$col}{'RENAME'}."\", field: \"".$OutColHash{$col}{'field'}."\", formatter: formatter},\n";	
 		}
 	}
 }
@@ -1118,13 +1161,22 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 				for( my $fieldNbr = 0 ; $fieldNbr < scalar @{$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}} ; $fieldNbr++){
 					#print $fieldNbr."\n";
 		
+
 					if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]){
-						$htmlStart .= "".$OutColHash{$fieldNbr + 1 }{'field'}.": '".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]."',\n";
+						if ($fieldNbr eq $NameColHash{'AnnotSV_ID'} - 1){
+							$htmlStart .= "".$OutColHash{$fieldNbr + 1 }{'field'}.": '"."<a href=\"".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'url2UCSC'}."\">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]."</a>',\n";
+						}else{
+							$htmlStart .= "".$OutColHash{$fieldNbr + 1 }{'field'}.": '".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]."',\n";
+						}
 					}else{
-						$htmlStart .= "".$OutColHash{$fieldNbr + 1 }{'field'}.": '.',\n";
+							$htmlStart .= "".$OutColHash{$fieldNbr + 1 }{'field'}.": '.',\n";
 					}
+
+					
 				} #END FOR FULL+SPLIT tab
 				
+				$htmlStart .= "LOEUF_color: '".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$NameColHash{'Gene_name'} -1}."'\n";
+
 				$htmlStart .= "};\n";
 
 			}   # END FOREACH VARIANT
