@@ -1029,12 +1029,7 @@ my $htmlStart = "<!DOCTYPE html>\n<html>
 \n<title>".$outPrefix.$outBasename."</title>\n
 \n<link rel=\"shortcut icon\" href=\"https://github.com/mobidic/knotAnnotSV/raw/master/images/knot_favicon.png\" type=\"image/png\"/>
 
-
-
-
-\n<link rel=\"stylesheet\" href=\"/home/puce/PROJECTS/SlickGrid/slick.grid.css\" type=\"text/css\"/>
-\n<link rel=\"stylesheet\" href=\"/home/puce/PROJECTS/SlickGrid/css/smoothness/jquery-ui.css\" type=\"text/css\"/>
-\n<link rel=\"stylesheet\" href=\"/home/puce/PROJECTS/SlickGrid/examples/examples.css\" type=\"text/css\"/>
+\n<link rel=\"stylesheet\" href=\"/home/tg/TOOLS/w2ui-1.5.rc1.css\" type=\"text/css\"/>
 
 \n<style>
 \n.loeufbin0{
@@ -1068,69 +1063,46 @@ my $htmlStart = "<!DOCTYPE html>\n<html>
 \n\tbackground-color: ".$LOEUF_ColorHash{'9.0'}.";	
 \n}
 \n</style>
+\n<script src=\"http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js\"></script>
+\n<script type=\"text/javascript\" src=\"/home/tg/TOOLS/w2ui-1.5.rc1.min.js\"></script>
 
 
 \n</head>
 \n<body>
-\n<table width=\"100%\">
-\n  <tr>
-\n   <td valign=\"top\" width=\"80%\">
-\n    <div id=\"myGrid\" style=\"width:1000px;height:700px;\"></div>
-\n    </td>
-\n    <td valign=\"top\">
-\n      <h2>Demonstrates:</h2>
-\n      <ul>
-\n        <li>basic grid with minimal configuration</li>
-\n      </ul>
-\n        <h2>View Source:</h2>
-\n        <ul>
-\n            <li><A href=\"https://github.com/6pac/SlickGrid/blob/master/examples/example1-simple.html\" target=\"_sourcewindow\"> View the source for this example on Github</a></li>
-\n        </ul>
-\n    </td>
-\n  </tr>
-\n</table>
+\n<div id=\"grid\" style=\"width: 100%; height: 400px;\"></div>
+\n</body>
 
+\n<script type=\"text/javascript\">
+\$(function () {
+	\$('#grid').w2grid({ 
+		name: 'grid', 
+		columns: [";
 
-
-\n<script src=\"/home/puce/PROJECTS/SlickGrid/lib/jquery-1.12.4.min.js\"></script>
-\n<script src=\"/home/puce/PROJECTS/SlickGrid/lib/jquery.event.drag-2.3.0.js\"></script>
-\n<script src=\"/home/puce/PROJECTS/SlickGrid/slick.core.js\"></script>
-\n<script src=\"/home/puce/PROJECTS/SlickGrid/slick.grid.js\"></script>
-
-\n<script>
-
-	function formatter(row, cell, value, columnDef, dataContext) {
-		return value;
-	}
-	function GeneNameFormatter(row, cell, value, columnDef, dataContext) {
-		return \"<span style='color:\"+ dataContext[LOEUF_color]+\"'>\" + value + \"</span>\";
-	}
-
-
-	var grid;
-	var columns = [";
-
+                
 
 foreach my $col (sort {$a <=> $b} keys %OutColHash){
 			#print HTML "\t<th style=\"word-wrap: break-word\"   >";
 	print "colNbr:   ".$col."\t".$OutColHash{$col}{'field'}."\n";  
 	if (defined $OutColHash{$col}{'field'} && $col != 0){
 		if (defined $OutColHash{$col}{'field'} && $OutColHash{$col}{'field'} eq "Gene_name"){
-			$htmlStart .= "{id: \"".$OutColHash{$col}{'field'}."\", name: \"".$OutColHash{$col}{'RENAME'}."\", field: \"".$OutColHash{$col}{'field'}."\", formatter: GeneNameFormatter},\n";
+			$htmlStart .= "\t\t\t{field: \"".$OutColHash{$col}{'field'}."\", caption: \"".$OutColHash{$col}{'RENAME'}."\", size: '30%'},\n";
+		}elsif (defined $OutColHash{$col}{'field'} && $OutColHash{$col}{'field'} eq "AnnotSV_ID"){
+			$htmlStart .= "\t\t\t{field: \"".$OutColHash{$col}{'field'}."\", caption: \"TOTO\", size: '30%'},\n";
+			#$htmlStart .= "{field: \"".$OutColHash{$col}{'field'}."\", caption: \"".$OutColHash{$col}{'RENAME'}."\", render: function (record, index, column_index) { 
+			#  var html =  record.AnnotSV_ID;
+			#  return html;
+			#}  },\n";
+		   
 		}else{
-			$htmlStart .= "{id: \"".$OutColHash{$col}{'field'}."\", name: \"".$OutColHash{$col}{'RENAME'}."\", field: \"".$OutColHash{$col}{'field'}."\", formatter: formatter},\n";	
+			$htmlStart .= "\t\t\t{field: \"".$OutColHash{$col}{'field'}."\", caption: \"".$OutColHash{$col}{'RENAME'}."\", size: '30%'},\n";	
 		}
 	}
 }
-$htmlStart .= "];
+$htmlStart .= "],\n\n";
+        
 
 
-  var options = {
-    enableCellNavigation: true,
-    enableColumnReorder: false
-  };
-
-	var data = [];\n";
+$htmlStart .= "\t\trecords: [\n";
 
 my $kindRank=0;
 
@@ -1155,7 +1127,7 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 				#FILL tab 'ALL';
 				#if (    $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Annotation_mode'} - 1] eq "full") {
 			
-				$htmlStart .= "data[".$kindRank."]={\n";
+				$htmlStart .= "\t\t\t{recid: ".$kindRank.", ";
 
 				#Once for "ALL"  = FULL+SPLIT
 				for( my $fieldNbr = 0 ; $fieldNbr < scalar @{$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}} ; $fieldNbr++){
@@ -1164,20 +1136,25 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 
 					if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]){
 						if ($fieldNbr eq $NameColHash{'AnnotSV_ID'} - 1){
-							$htmlStart .= "".$OutColHash{$fieldNbr + 1 }{'field'}.": '"."<a href=".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'url2UCSC'}.">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]."</a>',\n";
+							$htmlStart .= "".$OutColHash{$fieldNbr + 1 }{'field'}.": '"."<a href=".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'url2UCSC'}.">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]."</a>',";
 						}else{
-							$htmlStart .= "".$OutColHash{$fieldNbr + 1 }{'field'}.": '".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]."',\n";
+							$htmlStart .= "".$OutColHash{$fieldNbr + 1 }{'field'}.": '".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]."',";
 						}
 					}else{
-							$htmlStart .= "".$OutColHash{$fieldNbr + 1 }{'field'}.": '.',\n";
+							$htmlStart .= "".$OutColHash{$fieldNbr + 1 }{'field'}.": '.',";
 					}
 
 					
 				} #END FOR FULL+SPLIT tab
 				
-				$htmlStart .= "LOEUF_color: '".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$NameColHash{'Gene_name'} -1}."'\n";
+				$htmlStart .= "LOEUF_color: '".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$NameColHash{'Gene_name'} -1}."',";
+				if (    $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Annotation_mode'} - 1] eq "full") {
+					$htmlStart .=  "w2ui: { style: \"background-color:".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'fullRowColor'}  .";\"}},\n"; 
+				}else{
+					$htmlStart .=  "w2ui: { style: {".($NameColHash{'Gene_name'}-1).": 'background-color: ".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$NameColHash{'Gene_name'} -1}.";'}}},\n"; 
 
-				$htmlStart .= "};\n";
+				} 
+				#$htmlStart .= "};\n";
 
 			}   # END FOREACH VARIANT
 
@@ -1188,17 +1165,12 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 
 
 
+        
 
-
-
-
-
-
-
-$htmlStart .= "\ngrid = new Slick.Grid(\"#myGrid\", data, columns, options);
-
+$htmlStart .= "],
+    });    
+});
 \n</script>
-\n</body>
 </html>";
 
 
