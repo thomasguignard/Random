@@ -42,8 +42,15 @@ my $workbook;
 $workbook = Excel::Writer::XLSX->new("toto.xlsx");
 
 my $worksheet = $workbook->add_worksheet('knot');
-$worksheet->freeze_panes( 1, 0 );    # Freeze the first row
+$worksheet->freeze_panes( 1, 1);    # Freeze the first row and first column
 my $worksheetLine = 0;
+$worksheet->set_column( 'A:A', 30 );
+$worksheet->set_column( 'B:Z', 15 );
+
+# Write a hyperlink
+my $hyperlink_format = $workbook->add_format(color => 'blue', underline => 1);
+
+
 
 
 #use Switch;
@@ -554,6 +561,7 @@ while( <VCF> ){
 		my $tempString;
 		#add url to OMIM_ID
 			if ($dataHash{"OMIM_ID"} ne "."){
+				$dataHash{"OMIM_ID_XLSX"} = $dataHash{"OMIM_ID"};
 				$tempString = "";
 				@OMIM_ID_array = split(/; /, $dataHash{"OMIM_ID"} );
 				for( my $ID = 0 ; $ID < scalar @OMIM_ID_array; $ID++){
@@ -568,6 +576,7 @@ while( <VCF> ){
 			}
 
 			if ($dataHash{"OMIM_phenotype"} ne "."){
+				$dataHash{"OMIM_phenotype_XLSX"} = $dataHash{"OMIM_phenotype"} ;
 				$tempString = "";
 				@OMIM_phen_array = split(/; /, $dataHash{"OMIM_phenotype"} );
 				if(@OMIM_phen_array){
@@ -609,6 +618,7 @@ while( <VCF> ){
 
 			#URL for gene name
 			if ($dataHash{"Gene_name"} ne "."){
+				$dataHash{"Gene_name_XLSX"} = $dataHash{"Gene_name"} ;
 				$tempString = "";
 				@GeneName_array = split(/; /, $dataHash{"Gene_name"} );
 				for( my $ID = 0 ; $ID < scalar @GeneName_array; $ID++){
@@ -969,12 +979,15 @@ while( <VCF> ){
 
 			#URL to HUGO HGNC for split line only
 			$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'GeneName_short'} = $GeneName_link_string ; 
+			$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'GeneName_short_XLSX'} = $dataHash{'Gene_name_XLSX'} ; 
 
 			#url to OMIM
 			#$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'url2OMIM'} = "https://www.omim.org/entry/".$dataHash{"OMIM_ID"}  ;
 
 			$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'OMIM_ID_short'} = $OMIM_ID_link_string ; 
+			$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'OMIM_ID_short_XLSX'} = $dataHash{"OMIM_ID_XLSX"} ; 
 			$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'OMIM_phen_short'} = $OMIM_phen_link_string ; 
+			$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'OMIM_phen_short_XLSX'} = $dataHash{"OMIM_phenotype_XLSX"}   ; 
 
 
 			#comment assigment
@@ -1596,7 +1609,7 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 				$format_pLI = $workbook->add_format(bg_color => $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'fullRowColor'} );
 			}else{
 				$htmlALL .= "<tr class=\"fullsplit ".$ID."\" >\n";
-				$format_pLI = $workbook->add_format(bg_color => '#FFFFFF');
+				$format_pLI = $workbook->add_format(bg_color => 'undef');
 			}
 
 
@@ -1606,7 +1619,14 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 			for( my $fieldNbr = 0 ; $fieldNbr < scalar @{$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}} ; $fieldNbr++){
 		
 				if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashComments'}{$fieldNbr}){
-						$worksheet->write_comment( $worksheetLine, $fieldNbr,   $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashCommentsXLSX'}{$fieldNbr},x_scale => 2, y_scale => 5)  ;   
+
+						if (defined $NameColHash{'OMIM_phenotype'} && $fieldNbr eq $NameColHash{'OMIM_phenotype'} - 1 ){
+							$worksheet->write_comment( $worksheetLine, $fieldNbr,   $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_phen_short_XLSX'},x_scale => 2, y_scale => 5)  ;   
+
+						}else{
+							$worksheet->write_comment( $worksheetLine, $fieldNbr,   $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashCommentsXLSX'}{$fieldNbr},x_scale => 2, y_scale => 5)  ;   
+
+						}
 
 
 						if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr}){
@@ -1667,11 +1687,18 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 					#Add url to UCSC browser or HGNC with gene name
 					if ($fieldNbr eq $NameColHash{'AnnotSV_ID'} - 1){
 						$htmlALL .= "<div class=\"tooltip\"><a href=\"".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'url2UCSC'}."\">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]."</a>";
+
+
+						$worksheet->write_url( $worksheetLine, $fieldNbr, $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'url2UCSC'} , $hyperlink_format, $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr])  ;   
+
+
 					
 					#}elsif ($fieldNbr eq $NameColHash{'Gene_name'} - 1  &&  $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Annotation_mode'} - 1] eq "split" ){
 					}elsif (defined $NameColHash{'Gene_name'} && $fieldNbr eq $NameColHash{'Gene_name'} - 1 ){
 					
 						$htmlALL .= "<div class=\"tooltip\">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short'};
+						
+						$worksheet->write_url( $worksheetLine, $fieldNbr, 'https://www.omim.org/entry/'.$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short_XLSX'}.'' , $hyperlink_format, $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short_XLSX'})  ;   
 					
 					}elsif (defined $NameColHash{'OMIM_phenotype'} && $fieldNbr eq $NameColHash{'OMIM_phenotype'} - 1 ){
 
@@ -1680,6 +1707,8 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 					}elsif (defined $NameColHash{'OMIM_ID'} && $fieldNbr eq $NameColHash{'OMIM_ID'} - 1 ){
 
 						$htmlALL .= "<div class=\"tooltip\">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_ID_short'};
+					
+						$worksheet->write_url( $worksheetLine, $fieldNbr, 'https://www.omim.org/entry/'.$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_ID_short_XLSX'} , $hyperlink_format , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_ID_short_XLSX'}   )  ;   
 					
 					}else{
 							if( length($hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]) > 50 ){
