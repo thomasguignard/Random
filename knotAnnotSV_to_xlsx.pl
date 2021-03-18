@@ -37,21 +37,6 @@ use Excel::Writer::XLSX;
 
 
 
-my $workbook;
-
-$workbook = Excel::Writer::XLSX->new("toto.xlsx");
-
-my $worksheet = $workbook->add_worksheet('knot');
-$worksheet->freeze_panes( 1, 1);    # Freeze the first row and first column
-my $worksheetLine = 0;
-$worksheet->set_column( 'A:A', 30 );
-$worksheet->set_column( 'B:Z', 15 );
-
-# Write a hyperlink
-my $hyperlink_format = $workbook->add_format(color => 'blue', underline => 1);
-
-
-
 
 #use Switch;
 #use Data::Dumper;
@@ -672,6 +657,10 @@ while( <VCF> ){
 					$tempString .= $ReGene."; ";
 				}
 				$dataHash{"RE_gene"} = $tempString;
+				
+				$tempString =~ s/<br>/\n/g ;
+				$dataHash{"RE_gene_XLSX"} = $tempString  ;
+
 			}
 			
 
@@ -988,6 +977,10 @@ while( <VCF> ){
 			$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'OMIM_ID_short_XLSX'} = $dataHash{"OMIM_ID_XLSX"} ; 
 			$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'OMIM_phen_short'} = $OMIM_phen_link_string ; 
 			$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'OMIM_phen_short_XLSX'} = $dataHash{"OMIM_phenotype_XLSX"}   ; 
+
+	
+			#add RE_gene for XLSX
+			$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'RE_gene_XLSX'} = $dataHash{"RE_gene_XLSX"}; 
 
 
 			#comment assigment
@@ -1530,9 +1523,26 @@ $htmlALL .= "\n\t<table id='tabFULLSPLIT' class='display compact' >
 				\n\t\t\t<tr>";
 
 
-my $XLSXcol = 0;
 
-#$format_pLI = $workbook->add_format(bg_color => '#FFFFFF');
+#prepare excel file
+my $workbook;
+
+$workbook = Excel::Writer::XLSX->new($outDir."/".$outPrefix.$outBasename.".xlsx");
+
+my $worksheet = $workbook->add_worksheet($outPrefix.$outBasename);
+$worksheet->freeze_panes( 1, 2);    # Freeze the first row and first column
+my $worksheetLine = 0;
+$worksheet->set_column( 'A:A', 8 );
+$worksheet->set_column( 'B:B', 30 );
+$worksheet->set_column( 'C:Z', 15 );
+
+
+
+my $XLSXcol = 0;
+#initialise first rank column
+my $format_header = $workbook->add_format(bold => 1);
+$worksheet->write( 0, $XLSXcol  , 'RANK', $format_header  );
+$worksheet->set_row( 0, 30);
 
 foreach my $col (sort {$a <=> $b} keys %OutColHash){
 			#print HTML "\t<th style=\"word-wrap: break-word\"   >";
@@ -1554,7 +1564,7 @@ foreach my $col (sort {$a <=> $b} keys %OutColHash){
 		}else{
 			$htmlALL .= "\t<th class=\"tooltipHeader\">".$OutColHash{$col}{'RENAME'}."\t</th>\n";
 		}
-		$worksheet->write( 0, $XLSXcol, $OutColHash{$col}{'RENAME'}  );
+		$worksheet->write( 0, $XLSXcol + 1 , $OutColHash{$col}{'RENAME'}, $format_header );
 		$XLSXcol ++;
 	}
 }
@@ -1581,6 +1591,9 @@ open(HTML, '>', $outDir."/".$outPrefix.$outBasename.".html") or die $!;
 my $kindRank=0;
 
 my $format_pLI;
+my $format_pLI_url;
+my $format_pLI_basic;
+
 
 # check if last line was "FULL" to finish the raw with </tr>
 
@@ -1606,14 +1619,24 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 			#FILL tab 'ALL';
 			if (    $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Annotation_mode'} - 1] eq "full") {
 				$htmlALL .= "<tr id=\"".$ID."\" class=\"full\" style=\"background-color:".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'fullRowColor'}."\" >\n";
+
 				$format_pLI = $workbook->add_format(bg_color => $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'fullRowColor'} );
+				$format_pLI_url = $workbook->add_format(bg_color => $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'fullRowColor'},color => 'blue', underline => 1 );
+				$format_pLI_basic = $workbook->add_format(bg_color => $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'fullRowColor'} );
+
 			}else{
 				$htmlALL .= "<tr class=\"fullsplit ".$ID."\" >\n";
+				
+				#Line grouping 
+				$worksheet->set_row( $worksheetLine , undef, undef, 1, 1 );
 				$format_pLI = $workbook->add_format(bg_color => 'undef');
+				$format_pLI_url = $workbook->add_format(bg_color => 'undef' ,color => 'blue', underline => 1 );
+				$format_pLI_basic = $workbook->add_format(bg_color => 'undef');
 			}
 
-
-			$worksheet->write_row( $worksheetLine, 0,$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}, $format_pLI  );
+			#add first column with original rank of knot
+			$worksheet->write( $worksheetLine, 0, $kindRank, $format_pLI  );
+			$worksheet->write_row( $worksheetLine, 1,$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}, $format_pLI  );
 
 			#Once for "ALL"  = FULL+SPLIT
 			for( my $fieldNbr = 0 ; $fieldNbr < scalar @{$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}} ; $fieldNbr++){
@@ -1621,17 +1644,18 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 				if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashComments'}{$fieldNbr}){
 
 						if (defined $NameColHash{'OMIM_phenotype'} && $fieldNbr eq $NameColHash{'OMIM_phenotype'} - 1 ){
-							$worksheet->write_comment( $worksheetLine, $fieldNbr,   $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_phen_short_XLSX'},x_scale => 2, y_scale => 5)  ;   
+							$worksheet->write_comment( $worksheetLine, $fieldNbr + 1 ,   $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_phen_short_XLSX'},x_scale => 2, y_scale => 5)  ;   
 
 						}else{
-							$worksheet->write_comment( $worksheetLine, $fieldNbr,   $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashCommentsXLSX'}{$fieldNbr},x_scale => 2, y_scale => 5)  ;   
+							$worksheet->write_comment( $worksheetLine, $fieldNbr + 1 ,   $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashCommentsXLSX'}{$fieldNbr},x_scale => 2, y_scale => 5)  ;   
 
 						}
 
 
 						if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr}){
 							$format_pLI = $workbook->add_format(bg_color => $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr} );
-							$worksheet->write( $worksheetLine, $fieldNbr, $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]  , $format_pLI)  ;   
+							$worksheet->write( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]  , $format_pLI)  ;  
+
 							
 						}
 
@@ -1684,12 +1708,16 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 				if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]){
 					#print HTML $field;
 
+					if (defined $NameColHash{'RE_gene'} && $fieldNbr eq $NameColHash{'RE_gene'} - 1 ){
+
+						$worksheet->write( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'RE_gene_XLSX'} )  ;   
+					}
+
 					#Add url to UCSC browser or HGNC with gene name
 					if ($fieldNbr eq $NameColHash{'AnnotSV_ID'} - 1){
 						$htmlALL .= "<div class=\"tooltip\"><a href=\"".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'url2UCSC'}."\">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]."</a>";
 
-
-						$worksheet->write_url( $worksheetLine, $fieldNbr, $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'url2UCSC'} , $hyperlink_format, $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr])  ;   
+						$worksheet->write_url( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'url2UCSC'} , $format_pLI_url, $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr])  ;   
 
 
 					
@@ -1697,8 +1725,25 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 					}elsif (defined $NameColHash{'Gene_name'} && $fieldNbr eq $NameColHash{'Gene_name'} - 1 ){
 					
 						$htmlALL .= "<div class=\"tooltip\">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short'};
-						
-						$worksheet->write_url( $worksheetLine, $fieldNbr, 'https://www.omim.org/entry/'.$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short_XLSX'}.'' , $hyperlink_format, $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short_XLSX'})  ;   
+					
+
+		
+						if (    $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Annotation_mode'} - 1] ne "full") {
+							 if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr}){
+								$format_pLI_basic = $workbook->add_format(bg_color => $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr}, color =>      'blue', underline => 1 );
+							 }
+						}
+
+
+						if (length('https://www.genecards.org/cgi-bin/carddisp.pl?gene='.$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short_XLSX'}) < 50){
+
+							$worksheet->write_url( $worksheetLine, $fieldNbr  , 'https://www.genecards.org/cgi-bin/carddisp.pl?gene='.$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short_XLSX'}.'' , $format_pLI_url, $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short_XLSX'})  ;   
+
+						}else{
+								
+							$worksheet->write( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short_XLSX'} , $format_pLI_basic)  ;   
+
+						}
 					
 					}elsif (defined $NameColHash{'OMIM_phenotype'} && $fieldNbr eq $NameColHash{'OMIM_phenotype'} - 1 ){
 
@@ -1708,7 +1753,16 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 
 						$htmlALL .= "<div class=\"tooltip\">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_ID_short'};
 					
-						$worksheet->write_url( $worksheetLine, $fieldNbr, 'https://www.omim.org/entry/'.$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_ID_short_XLSX'} , $hyperlink_format , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_ID_short_XLSX'}   )  ;   
+
+						if (length('https://www.omim.org/entry/'.$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short_XLSX'}) < 250){
+
+							$worksheet->write_url( $worksheetLine, $fieldNbr + 1 , 'https://www.omim.org/entry/'.$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_ID_short_XLSX'} , $format_pLI_url, $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_ID_short_XLSX'}   )  ;   
+						}else{
+							$worksheet->write( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_ID_short_XLSX'} , $format_pLI_basic )  ;   
+
+						}
+						
+							
 					
 					}else{
 							if( length($hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]) > 50 ){
@@ -1716,7 +1770,7 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 							}else{
 								$htmlALL .= "<div class=\"tooltip\">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr];
 							}
-
+							
 					}
 
 					#adjust tooltip position relativelly to column number
