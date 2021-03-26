@@ -94,7 +94,6 @@ my @GeneName_array;
 my @RE_gene_array;
 
 my %debugHash;
-my $fullToCollapse="";
 
 my $genomeBuild="";
 #style alignment for tooltiptext
@@ -545,7 +544,7 @@ while( <VCF> ){
 				$tempString = "";
 				@OMIM_ID_array = split(/; /, $dataHash{"OMIM_ID"} );
 				for( my $ID = 0 ; $ID < scalar @OMIM_ID_array; $ID++){
-					$tempString .=    "<a href=\"https://www.omim.org/entry/".$OMIM_ID_array[$ID]."\" target=\"_blank\" rel=\"noopener noreferrer\" >".$OMIM_ID_array[$ID]."; </a>";
+					$tempString .=    "<a href=\"https://www.omim.org/entry/".$OMIM_ID_array[$ID]."\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color:#00FFFF\">".$OMIM_ID_array[$ID]."; </a>";
 					if($ID < 5){
 						$OMIM_ID_link_string .= "<a href=\"https://www.omim.org/entry/".$OMIM_ID_array[$ID]."\" target=\"_blank\" rel=\"noopener noreferrer\" >".$OMIM_ID_array[$ID]."; </a>";
 					}
@@ -561,7 +560,7 @@ while( <VCF> ){
 				if(@OMIM_phen_array){
 					for ( my $ID = 0 ; $ID < scalar @OMIM_phen_array ; $ID++){
 						if( $OMIM_phen_array[$ID] =~ m/^(.+?)(\d{6})(.+?)$/){
-							$tempString .=   $1."<a href=\"https://www.omim.org/entry/".$2."\" target=\"_blank\" rel=\"noopener noreferrer\" >".$2."</a>".$3.";<br>";   	
+							$tempString .=   $1."<a href=\"https://www.omim.org/entry/".$2."\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color:#00FFFF\">".$2."</a>".$3.";<br>";   	
 						
 							#DEBUG TODO not sure
 							if ( $ID == 0 ){
@@ -601,7 +600,7 @@ while( <VCF> ){
 				@GeneName_array = split(/; /, $dataHash{"Gene_name"} );
 				for( my $ID = 0 ; $ID < scalar @GeneName_array; $ID++){
 					$GeneName_hash{$GeneName_array[$ID]} = 1;
-					$tempString .=    "<a href=\"https://www.genecards.org/cgi-bin/carddisp.pl?gene=".$GeneName_array[$ID]."\" target=\"_blank\" rel=\"noopener noreferrer\">".$GeneName_array[$ID]."; </a>";
+					$tempString .=    "<a href=\"https://www.genecards.org/cgi-bin/carddisp.pl?gene=".$GeneName_array[$ID]."\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color:#00FFFF\">".$GeneName_array[$ID]."; </a>";
 					if($ID < 5){
 						$GeneName_link_string .= "<a href=\"https://www.genecards.org/cgi-bin/carddisp.pl?gene=".$GeneName_array[$ID]."\" target=\"_blank\" rel=\"noopener noreferrer\" >".$GeneName_array[$ID]."</a>; ";
 					}
@@ -943,7 +942,7 @@ while( <VCF> ){
 
 			
 			#url to UCSC for SV , highlight in blue and zoomout x1.5
-			$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'url2UCSC'} = "\"http://genome.ucsc.edu/cgi-bin/hgTracks?db=".$genomeBuild."&position=chr".$dataHash{"SV_chrom"}.":".$dataHash{"SV_start"}."-".$dataHash{"SV_end"}."&hgt.out1=submit&highlight=".$genomeBuild.".chr".$dataHash{"SV_chrom"}.":".$dataHash{"SV_start"}."-".$dataHash{"SV_end"}."#aaedff\" target=\"_blank\" rel=\"noopener noreferrer\"" ; 
+			$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'url2UCSC'} = "http://genome.ucsc.edu/cgi-bin/hgTracks?db=".$genomeBuild."&position=chr".$dataHash{"SV_chrom"}.":".$dataHash{"SV_start"}."-".$dataHash{"SV_end"}."&hgt.out1=submit&highlight=".$genomeBuild.".chr".$dataHash{"SV_chrom"}.":".$dataHash{"SV_start"}."-".$dataHash{"SV_end"}."#aaedff\" target=\"_blank\" rel=\"noopener noreferrer\"" ; 
 
 			#URL to HUGO HGNC for split line only
 			$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'GeneName_short'} = $GeneName_link_string ; 
@@ -1029,159 +1028,513 @@ my $htmlStart = "<!DOCTYPE html>\n<html>
 \n<meta charset=\"utf-8\">
 \n<title>".$outPrefix.$outBasename."</title>\n
 \n<link rel=\"shortcut icon\" href=\"https://github.com/mobidic/knotAnnotSV/raw/master/images/knot_favicon.png\" type=\"image/png\"/>
+\n<script type=\"text/javascript\" language=\"javascript\" src='".$path2jquery."jquery-3.5.1.js'></script>
+\n<script type=\"text/javascript\" language=\"javascript\" src='".$path2jqueryDT."jquery.dataTables.min.js'></script>
+\n<script type=\"text/javascript\" language=\"javascript\" src='".$path2jsFCDT."dataTables.fixedColumns.min.js'></script>
+\n<script type=\"text/javascript\" > 
 
-\n<link rel=\"stylesheet\" href=\"./w2ui-1.5.rc1.css\" type=\"text/css\"/>
+
+var openTab;
+
+//document ready
+\$(document).ready(function() {
+					
+				var height = \$(window).height();
+				if (height < 840){
+					var h = Math.floor(height - 280);
+				}else{
+					var h = Math.floor(height - height/3);
+				}
+				var filterHash = new Object();
+				var keyType = \"".($NameColHash{'Annotation_mode'} - 1)."\";
+				var keyAnnotID = \"".($NameColHash{'AnnotSV_ID'} - 1)."\";
+				var fullMode = 'full';	
+				var dblClickMode = 'off';	
+				var oldStart = 0;
+
+				//input FILTER
+				var head = '#tabFULLSPLIT thead';
+				\$(head+' tr').clone(true).appendTo(head);
+	
+				\$(head+' tr:eq(1) th').each( function (i) {
+					\$(this).removeClass('sorting').removeClass('sorting_asc').removeClass('sorting_desc');
+					\$(this).unbind();
+					let title = \$(this).text();
+					\$(this).html( '<input type=\"text\" placeholder=\"Search\" data-index=\"'+i+'\" />' );
+				}); //END FILTER
+
+
+
+				//INITIALISATION
+				var tabFULLSPLIT = \$('#tabFULLSPLIT').DataTable({
+					stateSave: true,
+					stateDuration: 0,
+					order: [],
+					paging: true,
+					orderCellsTop: true,
+					scrollX: true,
+					scrollY: h,
+					//scrollCollapse: true,
+					oLanguage: { sLengthMenu: 'Show _MENU_ lines',sInfo: 'Showing _START_ to _END_ of _TOTAL_ lines' },
+					lengthMenu: [
+							[-1, 100],
+							['All', 100]
+						],
+					fixedColumns:   {
+						leftColumns: 1,
+						heightMatch: 'auto',
+					 },
+					stateSaveParams: function( settings, data ) {
+						if (typeof filterHash == 'undefined') {
+							filterHash = new Object();
+						}
+						data.filter".$cleanOutBasename." = filterHash;	
+						data.fullMode".$cleanOutBasename." = fullMode;	
+						data.dblClickMode".$cleanOutBasename." = dblClickMode;	
+						//console.log('save__');
+					},
+					stateLoadParams: function( settings, data ) {
+						filterHash = data.filter".$cleanOutBasename.";
+						fullMode = data.fullMode".$cleanOutBasename.";	
+						dblClickMode = data.dblClickMode".$cleanOutBasename." ;	
+						//console.log('load__');
+					},
+					drawCallback: function (o) {
+						var newStart = this.api().page.info().start;
+						if ( newStart != oldStart ) {
+							\$('.dataTables_scrollBody').scrollTop(0);
+							oldStart = newStart;
+						}
+						\$('body').removeClass('waiting');
+					},
+			});  //END initialisation
+
+			//FILTER FUNCTION
+			\$(tabFULLSPLIT.table().container() ).on( 'keyup change', 'thead input', function (){ 
+
+						\$('body').addClass('waiting');
+						var expr = this.value;
+						var i = \$(this).data('index');
+						if(/^[!<>=]+\$/.test(expr)){
+							\$('body').removeClass('waiting');
+							return;
+						}
+						
+						if(expr === ''){
+							delete filterHash[i] ;
+						}else{
+
+							var exprClean = expr.replace(/\\s*/g, '');
+							filterHash[i] = new Object();
+							filterHash[i]['raw'] = exprClean;
+							if (/^[!<>=]/.test(expr)) {
+								var oper = expr.match(/^([!<>=]+)/);
+								var exp = exprClean.match(/^\\W+([-]?\\w+[.]?\\w*)/i);
+								filterHash[i]['operator'] = oper[0];
+								if (exp === null){
+									\$('body').removeClass('waiting');
+									return;
+								}
+								filterHash[i]['expr'] = exp[1];
+
+							}else{
+								filterHash[i]['operator'] = '==';
+								filterHash[i]['expr'] = new RegExp(`\${exprClean}`,'i');
+							}
+						}
+
+						tabFULLSPLIT.draw();
+					
+					});
+					
+
+			//button tab		
+			var tabs = `<div class=\"tab\" style=\"float: left;\">
+								<button id=\"FULLbutton\" class=\"tablinks active\" onclick=\"openTab(event, 'full')\">COMPACT</button>
+								<button id=\"FULLSPLITbutton\" class=\"tablinks\" onclick=\"openTab(event, 'fullsplit')\">EXPANDED</button>
+							</div>`;
+			\$('#tabFULLSPLIT_wrapper').prepend(tabs);
+			
+
+				//double click expand
+				\$('#tabFULLSPLIT tbody').on('dblclick', 'tr', function () {
+					var rowID = this.id;			
+					var fm = fullMode;
+					if (rowID !== '' && fullMode === 'full'){
+
+						\$('body').addClass('waiting');
+
+						if (dblClickMode == 'off'){
+							dblClickMode = 'on';
+							\$('#tabFULLSPLIT_wrapper .DTFC_LeftWrapper thead tr:eq(1) th:eq('+keyAnnotID+') input', \$('.tooltipHeader td')[keyAnnotID] ).val(rowID);
+							\$('#tabFULLSPLIT_wrapper .dataTables_scrollHead thead tr:eq(1) th:eq('+keyType+') input', \$('.tooltipHeader td')[keyType] ).val('' );
+							filterHash[keyAnnotID] = new Object();
+							filterHash[keyAnnotID]['raw'] = rowID;
+							filterHash[keyAnnotID]['operator'] = '==';
+							filterHash[keyAnnotID]['expr'] = new RegExp(`\${filterHash[keyAnnotID]['raw']}`,'i');
+							delete filterHash[keyType] ;
+
+						}else{
+							dblClickMode = 'off';
+							\$('#tabFULLSPLIT_wrapper .dataTables_scrollHead thead tr:eq(1) th:eq('+keyType+') input', \$('.tooltipHeader td')[keyType] ).val('full' );
+							\$('#tabFULLSPLIT_wrapper .DTFC_LeftWrapper thead tr:eq(1) th:eq('+keyAnnotID+') input', \$('.tooltipHeader td')[keyAnnotID] ).val('');
+							filterHash[keyType] = new Object();
+							filterHash[keyType]['raw'] = 'full';
+							filterHash[keyType]['operator'] = '==';
+							filterHash[keyType]['expr'] = new RegExp(`\${filterHash[keyType]['raw']}`,'i');
+							delete filterHash[keyAnnotID] ;
+
+						}
+						
+						tabFULLSPLIT.draw();
+
+					}
+				} ); //END DOUBLE CLICK
+
+				//FILTERING FUNCTION PUSH AT INITIALISATION
+				\$.fn.dataTableExt.afnFiltering.push(
+					function( oSettings, aData, iDataIndex ) {
+						var filtHash = filterHash;
+						var filtBool = true;
+						for (var keys in filtHash){
+							if (filtHash.hasOwnProperty(keys)) {
+								var row_data = aData[keys];
+			
+								switch (filtHash[keys]['operator']){
+									case '>': if(row_data > filtHash[keys]['expr']) {filtBool = true;continue;}else{ return false;}
+									case '<': if(row_data < filtHash[keys]['expr']) {filtBool = true;continue;}else{ return false;}
+									case '>=': if(row_data >= filtHash[keys]['expr']) {filtBool = true;continue;}else{ return false;}
+									case '<=': if(row_data <= filtHash[keys]['expr']) {filtBool = true;continue;}else{ return false;}
+									case '!=': if(row_data != filtHash[keys]['expr']) {filtBool = true;continue;}else{ return false;}
+									case '!': var m = row_data.match(filtHash[keys]['expr']); if(m === null){return true;}else{filtBool = false;continue;}
+									case '=': if(row_data == filtHash[keys]['expr']) {filtBool = true;continue;}else{ return false;}
+									case '==': var m = row_data.match(filtHash[keys]['expr']); if(m === null){return false;}else{filtBool = true;continue;}
+								}
+							}
+						}
+			
+						return filtBool;
+					}); //END function filterByExp
+
+
+
+
+				//Restore state				
+				var state = tabFULLSPLIT.state.loaded();						 
+				if ( state  ) {
+					//console.log('state__');
+					for (var keys in filterHash){
+						if (filterHash.hasOwnProperty(keys)) {
+							\$('#tabFULLSPLIT_wrapper .dataTables_scrollHead thead tr:eq(1) th:eq('+keys+') input', \$('.tooltipHeader td')[keys] ).val( filterHash[keys]['raw'] );
+							if (filterHash[keys]['operator'] == '=='){
+								filterHash[keys]['expr'] = new RegExp(`\${filterHash[keys]['raw']}`,'i');
+							}
+						}
+					}
+					if (fullMode == 'fullsplit'){
+						\$('#FULLbutton').removeClass('active');
+						\$('#FULLSPLITbutton').addClass('active');
+                                        }
+					if (dblClickMode == 'on'){
+						\$('#tabFULLSPLIT_wrapper .DTFC_LeftWrapper thead tr:eq(1) th:eq('+keyAnnotID+') input', \$('.tooltipHeader td')[keyAnnotID] ).val(filterHash[keyAnnotID]['raw']);
+					}
+
+					
+					
+					tabFULLSPLIT.draw();
+				}else{  //END restore
+					
+					//FULL view on load	
+					window.onload =	\$('#tabFULLSPLIT_wrapper .dataTables_scrollHead thead tr:eq(1) th:eq('+keyType+') input', \$('.tooltipHeader td')[keyType] ).val('full' ).change();			
+				}
+
+
+		
+
+
+	//click full split button
+	openTab =	function(evt, cityName) {
+				
+				\$('body').addClass('waiting');
+
+				if(cityName === 'full'){
+				
+					fullMode = 'full';
+
+					filterHash[keyType] = new Object();
+					filterHash[keyType]['raw'] = cityName;
+					filterHash[keyType]['operator'] = '==';
+					filterHash[keyType]['expr'] = new RegExp(`\${filterHash[keyType]['raw']}`,'i');
+					
+					\$('#FULLSPLITbutton').removeClass('active');
+					\$('#FULLbutton').addClass('active');
+					
+					\$('#tabFULLSPLIT_wrapper .dataTables_scrollHead thead tr:eq(1) th:eq('+keyType+') input', \$('.tooltipHeader td')[keyType] ).val(cityName );
+					
+				}else{
+					
+					fullMode = 'fullsplit';
+
+					delete filterHash[keyType] ;
+					\$('#FULLbutton').removeClass('active');
+					\$('#FULLSPLITbutton').addClass('active');
+					\$('#tabFULLSPLIT_wrapper .dataTables_scrollHead thead tr:eq(1) th:eq('+keyType+') input', \$('.tooltipHeader td')[keyType] ).val('');
+
+				}
+				
+				if (dblClickMode == 'on'){
+					dblClickMode = 'off';
+					\$('#tabFULLSPLIT_wrapper .DTFC_LeftWrapper thead tr:eq(1) th:eq('+keyAnnotID+') input', \$('.tooltipHeader td')[keyAnnotID] ).val('');
+					delete filterHash[keyAnnotID] ;
+				}
+	
+				
+				\$('#tabFULLSPLIT').DataTable().draw();
+			}
+
+
+			//hide slow loading div
+			var alertLoading = document.getElementById('alert');
+			alertLoading.style.display='none';
+
+
+
+});  //END document ready
+
+
+
+
+</script>
+\n<link rel=\"stylesheet\" type=\"text/css\" href='".$path2css."jquery.dataTables.min.css'>
+\n<link rel=\"stylesheet\" type=\"text/css\" href='".$path2FCcss."fixedColumns.dataTables.min.css'>
 
 \n<style>
-\n.loeufbin0{
-\n\tcolor: ".$LOEUF_ColorHash{'0.0'}."	
-\n}
-\n.loeufbin1{
-\n\tcolor: ".$LOEUF_ColorHash{'1.0'}."	
-\n}
-\n.loeufbin2{
-\n\tcolor: ".$LOEUF_ColorHash{'2.0'}."	
-\n}
-\n.loeufbin3{
-\n\tcolor: ".$LOEUF_ColorHash{'3.0'}."	
-\n}
-\n.loeufbin4{
-\n\tcolor: ".$LOEUF_ColorHash{'4.0'}."	
-\n}
-\n.loeufbin5{
-\n\tcolor: ".$LOEUF_ColorHash{'5.0'}."	
-\n}
-\n.loeufbin6{
-\n\tcolor: ".$LOEUF_ColorHash{'6.0'}."	
-\n}
-\n.loeufbin7{
-\n\tcolor: ".$LOEUF_ColorHash{'7.0'}."	
-\n}
-\n.loeufbin8{
-\n\tcolor: ".$LOEUF_ColorHash{'8.0'}."	
-\n}
-\n.loeufbin9{
-\n\tbackground-color: ".$LOEUF_ColorHash{'9.0'}.";	
-\n}
-\n.commentTitle {
-\n\tfont-weight: bold;
-\n}
+/* Style the tab */
+	.tab {
+		overflow: hidden;
+		border: 1px solid #ccc;
+		background-color: #f1f1f1;
+		left: 0;
+		bottom: 0;
+		height: 27px;
+		position: fixed;
+		position: -webkit-sticky;
+		position: sticky;
+		margin-right: 10px;
+		}
 
+/* Style the buttons inside the tab */
+	.tab button {
+		background-color: inherit;
+		float: left;
+		border: none;
+		outline: none;
+		cursor: pointer;
+		transition: 0.3s;
+		font-size: 90%;
+		height: 27px;
+		}
+/* Change background color of buttons on hover */
+	.tab button:hover {
+		background-color: #ddd;
+		}
+
+/* Create an active/current tablink class */
+	.tab button.active {
+		background-color: #ccc;
+		}
+	.tab button:focus {
+		background-color: #ccc;
+		}
+
+	td {
+		text-align: center;
+		}
+	thead input {
+		width: 100%;
+		}
+
+	#tabFULLSPLIT.display td.sorting_1{
+		background-color: inherit;
+	}
+
+	table.dataTable.display tbody tr.odd > .sorting_1, table.dataTable.order-column.stripe tbody tr.odd > .sorting_1{
+		background-color: inherit; 
+	}
+	table.dataTable.display tbody tr.even > .sorting_1, table.dataTable.order-column.stripe tbody tr.even > .sorting_1{
+		background-color: inherit; 
+	}
+
+
+
+/* Style the tab content */
+	.tabcontent {
+		display: block;
+		padding: 6px 12px;
+		/*border: 1px solid #ccc;*/
+		border-top: none;
+		}
+
+	.tooltipHeader{
+		position: relative;
+		font-size: 90%;
+		cursor: help;
+	}		
+	.tooltipHeader .tooltiptext{
+		visibility: hidden;
+		width: auto;
+		min-width: 250px;
+		max-width: 800px;
+		height: auto;
+		background-color: #1e1e1e;
+		color: #fff;
+		text-align: left;
+		border-radius: 6px;
+		padding: 5px 5px;
+		position: absolute;
+		z-index: 1;
+		top: -5px;
+		opacity: 0;
+		transition: opacity 0.3s;
+		text-overflow: ellipsis;
+		white-space: normal;
+		overflow-wrap: break-word;
+		box-shadow: 10px 10px 5px grey;
+		}
+	.tooltipHeader:hover .tooltiptext{
+		visibility: visible;
+		opacity: 1;
+	}	
+
+	.tooltip {
+		position: relative;
+		display: inline-block;
+		/*border-bottom: 1px dotted black;*/
+		min-width: 100px;
+		max-width: 300px;
+		overflow-wrap: break-word;
+		font-size: 70%;
+		}
+	
+	.tooltip .tooltiptext {
+		visibility: hidden;
+		width: auto;
+		min-width: 250px;
+		/*max-width: 290px;*/
+		max-width: 600px;
+		max-height: 300px;
+		background-color: #1e1e1e;
+		color: #fff;
+		text-align: left;
+		border-radius: 6px;
+		padding: 5px 5px;
+		position: absolute;
+		z-index: 1;
+		top: 100%;
+		opacity: 0;
+		transition: opacity 0.3s;
+		text-overflow: ellipsis;
+		white-space: normal;
+		overflow-wrap: break-word;
+		font-size: 100%;
+		overflow-y: scroll;
+		box-shadow: 10px 10px 5px grey;
+		}
+
+	.tooltip:hover .tooltiptext {
+		visibility: visible;
+		opacity: 1;
+		}
+		
+	.commentTitle {
+		color: #FF69B4; 
+		font-weight: bold;
+	}
+
+
+	div.dataTables_wrapper {
+		width: 100%;
+	/*	margin: 0 auto;*/
+	}
+	.DTFC_LeftBodyLiner { overflow-x: hidden; }
+	.DTFC_RightBodyLiner { overflow-x: hidden; }
+
+	#alert {
+		padding: 20px;
+		background-color: #2196F3;
+		color: white;
+		opacity: 1;
+		transition: opacity 0.6s;
+		margin-bottom: 15px;
+		}
+	
+	body.waiting * {
+		cursor: wait ;
+	}
 
 \n</style>
-\n<script src=\"http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js\"></script>
-\n<script type=\"text/javascript\" src=\"./w2ui-1.5.rc1.min.js\"></script>
-
 
 \n</head>
-\n<body>
-\n<div style=\"width: 98%; margin: 10px 10px 10px 10px; text-align:right;display: inline-block\"> <h3 style=\"margin: 0px 0px 0px 0px;\">".$outPrefix.$outBasename." in ".$genomeBuild."<a href=\"https://github.com/mobidic/knotAnnotSV\"  target=\"_blank\" rel=\"noopener noreferrer\" ><img src=\"https://github.com/mobidic/knotAnnotSV/raw/master/images/logoKNOT.png\" style=\"display:inline; width:12em;height:3em;\" align=\"left\" alt=\"Logo is Knot here.\"></a></h3></div>
-
-
-\n<div id=\"grid\" style=\"width: 100%; height: 400px;\"></div>
-\n</body>
-
-\n<script type=\"text/javascript\">
-
-
-\$(function () {
-	\$('#grid').w2grid({ 
-		name: 'grid', 
-		show: {
-			toolbar: true,
-			toolbarSearch: true,	
-			toolbarSave: true,
-			footer: true,
-		},
-		toolbar: {
-        	items: [
-				{ type: 'break' },
-        	    { type: 'button', id: 'Clear', text: 'Clear filters', icon: 'w2ui-icon-check' },
-				{ type: 'break' },
-        	    { type: 'button', id: 'COMPACT', text: 'COMPACT', icon: 'w2ui-icon-cross' },
-				{ type: 'break' },
-        	    { type: 'button', id: 'EXPANDED', text: 'EXPANDED', icon: 'w2ui-icon-plus' },
-				{ type: 'break' },
-        	    { type: 'button', id: 'SAVE', text: 'SAVE STATE', icon: 'w2ui-icon-check' },
-        	],
-        	onClick: function (event) {
-        	    if (event.target == 'COMPACT') fullToCollapse.forEach(element => w2ui['grid'].collapse(element));
-        	    if (event.target == 'EXPANDED') fullToCollapse.forEach(element => w2ui['grid'].expand(element));
-        	    if (event.target == 'Clear') w2ui['grid'].searchReset();
-        	    if (event.target == 'SAVE') w2ui['grid'].stateSave();
-        	}
-
-			
-		},
-
-		multiSearch: true,
-		textSearch: 'contains',
-		markSearch: false,
-		searches: [";
+\n\t<body class='waiting'>
+\n\n<div style=\"width: 98%; margin: 10px 10px 10px 10px; text-align:right;display: inline-block\"> <h3 style=\"margin: 0px 0px 0px 0px;\">".$outPrefix.$outBasename." in ".$genomeBuild." <a href=\"https://github.com/mobidic/knotAnnotSV\"  target=\"_blank\" rel=\"noopener noreferrer\" ><img src=\"https://github.com/mobidic/knotAnnotSV/raw/master/images/logoKNOT.png\" style=\"display:inline; width:12em;height:3em;\" align=\"left\" alt=\"Logo is Knot here.\"></a></h3></div>";
 
 
 
-foreach my $col (sort {$a <=> $b} keys %OutColHash){
-	if (defined $OutColHash{$col}{'field'} && $col != 0){
-		if (defined $OutColHash{$col}{'field'} ){
-			$htmlStart .= "\t\t\t{field: \"".$OutColHash{$col}{'field'}."\", caption: \"".$OutColHash{$col}{'RENAME'}."\", type: 'text'},\n";
-		}
-	}
-}
-	
+#table and columns names
 
-	$htmlStart .= "],\n\n\t\tcolumns: [";
 
-	
-#+'".$OutColHash{$col}{'field'}.": '+record.".$OutColHash{$col}{'field'}."+'<br>'+
+my $htmlALL= "<div id='alert'><strong><br><br><br><br><br><br>Knotting happens!</strong> Please hang on a few seconds...<br><br><br><br><br><br></div>
 
-                
+
+			<div id=\"FULL+SPLIT\" class=\"tabcontent\">";
+
+$htmlALL .= "\n\t<table id='tabFULLSPLIT' class='display compact' >
+				\n\t\t<thead>
+				\n\t\t\t<tr>";
+
 
 foreach my $col (sort {$a <=> $b} keys %OutColHash){
 			#print HTML "\t<th style=\"word-wrap: break-word\"   >";
-	print "colNbr:   ".$col."\t".$OutColHash{$col}{'field'}."\n";  
-	if (defined $OutColHash{$col}{'field'} && $col != 0){
-		if (defined $OutColHash{$col}{'field'} ){
-			if (defined  $dataCommentHash{$OutColHash{$col}{'field'}} ){
-				$htmlStart .= "\t\t\t{field: \"".$OutColHash{$col}{'field'}."\", caption: \"".$OutColHash{$col}{'RENAME'}."\", size: '30%', sortable: true, searchable: true,  tooltip: \"".$OutColHash{$col}{'HEADERTIPS'}."\",  \n
-					render: function(record) {\n
-						var html = '<div style=\"padding: 10px; max-width: 400px\">'+
-						'".$OutColHash{$col}{'field'}.": '+record.".$OutColHash{$col}{'field'}."+'<br>'+
-		                ''+record.".$OutColHash{$col}{'field'}."_comment +
-						'</div>';
-					return '<div class=\"overdelay\" onmouseover=\"\$(this).w2overlay( w2utils.base64decode(\\''+ w2utils.base64encode(html) +'\\'), { left: -15 });\" >' + record.".$OutColHash{$col}{'field'}." + '</div>';
+	if (defined $OutColHash{$col}{'field'}){
+		if (defined $OutColHash{$col}{'HEADERTIPS'}){
+			#adjust tooltip position relativelly to column number
+			if ($col <= ($OutColCounter/2)){
+				
+				if($col == 1){
+					$alignTooltiptext = "style=\"left: 1%;max-width:250px\"";
+				}else{
+					$alignTooltiptext = "style=\"left: 75%\"";
 				}
-				},"
-			
 			}else{
-				$htmlStart .= "\t\t\t{field: \"".$OutColHash{$col}{'field'}."\", caption: \"".$OutColHash{$col}{'RENAME'}."\", size: '30%', sortable: true, searchable: true,tooltip: \"".$OutColHash{$col}{'HEADERTIPS'}."\"},\n";
+				$alignTooltiptext = "style=\"right: 75%\"";
 			}
+
+			$htmlALL .= "\t<th class=\"tooltipHeader\" >".$OutColHash{$col}{'RENAME'}."<span ".$alignTooltiptext." class=\"tooltiptext tooltip-bottom\">".$OutColHash{$col}{'HEADERTIPS'}."</span> \t</th>\n";
 		}else{
-			$htmlStart .= "\t\t\t{field: \"".$OutColHash{$col}{'field'}."\", caption: \"".$OutColHash{$col}{'RENAME'}."\", size: '30%', sortable: true, searchable: true,tooltip: \"".$OutColHash{$col}{'HEADERTIPS'}."\"},\n";	
-		}
-	}
-}
-#2nd round for comments fields
-foreach my $col (sort {$a <=> $b} keys %OutColHash){
-			#print HTML "\t<th style=\"word-wrap: break-word\"   >";
-	if (defined $OutColHash{$col}{'field'} && $col != 0){
-		if (defined  $dataCommentHash{$OutColHash{$col}{'field'}} ){
-			$htmlStart .= "\t\t\t{field: \"".$OutColHash{$col}{'field'}."_comment\", caption: \"".$OutColHash{$col}{'field'}."_comment\", size: '30%', hidden: true, sortable: true, searchable: true},\n";
+			$htmlALL .= "\t<th class=\"tooltipHeader\">".$OutColHash{$col}{'RENAME'}."\t</th>\n";
 		}
 	}
 }
 
 
-$htmlStart .= "],\n\n";
-        
+$htmlALL .= "\n\t\t\t</tr>\n\t\t</thead>\n\t<tbody>\n";
+					
+
+my $htmlEndTable = "\t</tbody>\n\t</table>\n\t\t</div>\n\n\n";
+					
+my $htmlEnd = "\n\t</body>\n</html>";
 
 
-$htmlStart .= "\t\trecords: [\n";
 
+open(HTML, '>', $outDir."/".$outPrefix.$outBasename.".html") or die $!;
+
+
+#########################################################################
+#################### Sort by AnnotSV ranking for the output
+
+#create user friendly ranking score
 my $kindRank=0;
 
-my $fullBool=0;
-my $lastSplitBool=0;
 
 # check if last line was "FULL" to finish the raw with </tr>
 
@@ -1198,104 +1551,162 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 
 			foreach my $variant ( keys %{$hashFinalSortData{$rank}{$ID}{$rankSplit}}){
 			
-				#increse rank number then change final array
-				$kindRank++;
-
-				#deal with children rows
-				if (    $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Annotation_mode'} - 1] eq "full") {
-					if( $lastSplitBool == 1){
-						$htmlStart .= "\n\t\t\t\t\t]\n\t\t\t\t}\n\t\t\t},\n";
-						$lastSplitBool == 0;
-						$fullBool=1;
-					}
-				}
-			
-				$htmlStart .= "\t\t\t{recid: ".$kindRank.", ";
-
-				#Once for "ALL"  = FULL+SPLIT
-				for( my $fieldNbr = 0 ; $fieldNbr < scalar @{$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}} ; $fieldNbr++){
-					#print $fieldNbr."\n";
+			#increse rank number then change final array
+			$kindRank++;
 		
 
-					if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]){
-						if ($fieldNbr eq $NameColHash{'AnnotSV_ID'} - 1){
-							$htmlStart .= "".$OutColHash{$fieldNbr + 1 }{'field'}.": '"."<a href=".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'url2UCSC'}.">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]."</a>',";
-						}else{
-							$htmlStart .= "".$OutColHash{$fieldNbr + 1 }{'field'}.": '".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]."',";
-						}
+			#FILL tab 'ALL';
+			if (    $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Annotation_mode'} - 1] eq "full") {
+				$htmlALL .= "<tr id=\"".$ID."\" class=\"full\" style=\"background-color:".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'fullRowColor'}."\" >\n";
+			}else{
+				$htmlALL .= "<tr class=\"fullsplit ".$ID."\" >\n";
+			}
+
+			#Once for "ALL"  = FULL+SPLIT
+			for( my $fieldNbr = 0 ; $fieldNbr < scalar @{$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}} ; $fieldNbr++){
+				#print $fieldNbr."\n";
+				#print $hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."\n";
+
+	
+				#implementing rowspan only if line is "full" type
+				# TODO loop on finalArray with counter to skip first td SVID for split line
+				#if (     $hashFinalSortData{$rank}{$variant}{'finalArray'}[$NameColHash{'AnnotSV type'} - 1] eq "full") {
+       
+					
+				if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr}){
+					if ($hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Location'} - 1] eq "txStart-txEnd" || $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Location'} - 1] eq ".") {
+						$htmlALL .= "\t<td style=\"background-color:".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr}."\" ";
+
 					}else{
-							$htmlStart .= "".$OutColHash{$fieldNbr + 1 }{'field'}.": '.',";
+
+						if ($hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Location'} - 1] =~ /^txStart/) {
+							$htmlALL .= "\t<td style=\"background: linear-gradient(-45deg, white 50%, ".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr}." 50% )\" ";
+						}else{
+							$htmlALL .= "\t<td style=\"background: linear-gradient(-45deg,".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr}." 50%, white 50% )\" ";
+
+						}
 					}
 
-					
-				} #END FOR FULL+SPLIT tab
-
-				
-				#2nd round for comments fields
-				foreach my $col (sort {$a <=> $b} keys %OutColHash){
-				#print HTML "\t<th style=\"word-wrap: break-word\"   >";
-					if (defined $OutColHash{$col}{'field'} && $col != 0){
-						#DEBUG last line of tsv if (defined  $dataCommentHash{$OutColHash{$col}{'field'}} ){
-						if (defined  $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashComments'}{$NameColHash{$OutColHash{$col}{'field'}} -1} ){
-
-#{'hashComments'}{$NameColHash{$fieldCom} -1} 
-
-# $dataCommentHash{$OutColHash{$col}{'field'}}{'values'} =~ s/'/\\x27/g;
-							$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashComments'}{$NameColHash{$OutColHash{$col}{'field'}} -1} =~ s/'/\\x27/g;
-
-							#$htmlStart .= "".$OutColHash{$col}{'field'}."_comment : '".$dataCommentHash{$OutColHash{$col}{'field'}}{'values'}."',";
-							$htmlStart .= "".$OutColHash{$col}{'field'}."_comment : '".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashComments'}{$NameColHash{$OutColHash{$col}{'field'}} -1}."',";
-#							print  $OutColHash{$col}{'field'}."_comment : ".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashComments'}{$OutColHash{$col}{'field'}}{'values'}."\n";
-						}
+				}else{
+					if ($fieldNbr eq $NameColHash{'AnnotSV_ID'} - 1){
+						$htmlALL .= "\t<td data-order=\"".$kindRank."\" ";	
+					}else{
+						$htmlALL .= "\t<td ";
 					}
 				}
-
-
-				#Apply loeuf color for split lines
-				#if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$NameColHash{'Gene_name'} -1}){
-					$htmlStart .= "LOEUF_color: '".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$NameColHash{'Gene_name'} -1}."',";
+					#$htmlALL .= "\t<td rowspan=\".$hashFinalSortData{$rank}{$variant}{SVIDNbr}."\">";
 					#}
 
-				if (    $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Annotation_mode'} - 1] eq "full") {
-					$htmlStart .=  "w2ui: { style: \"background-color:".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'fullRowColor'}  .";\",\n\t\t\tchildren: [\n"; 
-					$fullToCollapse .= "".$kindRank.", ";
+
+				#define search field
+				if ($OutColHash{$fieldNbr + 1}{'field'} =~ /^OMIM_|^P_|^Gene_name/){
+					$htmlALL .= ">";
 				}else{
-					$htmlStart .=  "w2ui: { style: {".($NameColHash{'Gene_name'}-1).": 'background-color: ".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$NameColHash{'Gene_name'} -1}.";'}}},\n"; 
-					$lastSplitBool = 1;
-					$fullBool = 0;
-				} 
-				#$htmlStart .= "};\n";
+					$htmlALL .= "data-search=\"".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr] ."\">";
+				}
 
+				#if (defined $field){
+				if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]){
+					#print HTML $field;
+
+					#Add url to UCSC browser or HGNC with gene name
+					if ($fieldNbr eq $NameColHash{'AnnotSV_ID'} - 1){
+						$htmlALL .= "<div class=\"tooltip\"><a href=\"".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'url2UCSC'}."\">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]."</a>";
+					
+					#}elsif ($fieldNbr eq $NameColHash{'Gene_name'} - 1  &&  $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Annotation_mode'} - 1] eq "split" ){
+					}elsif (defined $NameColHash{'Gene_name'} && $fieldNbr eq $NameColHash{'Gene_name'} - 1 ){
+					
+						$htmlALL .= "<div class=\"tooltip\">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short'};
+					
+					}elsif (defined $NameColHash{'OMIM_phenotype'} && $fieldNbr eq $NameColHash{'OMIM_phenotype'} - 1 ){
+
+						$htmlALL .= "<div class=\"tooltip\">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_phen_short'};
+						
+					}elsif (defined $NameColHash{'OMIM_ID'} && $fieldNbr eq $NameColHash{'OMIM_ID'} - 1 ){
+
+						$htmlALL .= "<div class=\"tooltip\">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_ID_short'};
+					
+					}else{
+							if( length($hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]) > 50 ){
+								$htmlALL .= "<div class=\"tooltip\">".substr($hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr],0,45)."[...]";
+							}else{
+								$htmlALL .= "<div class=\"tooltip\">".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr];
+							}
+
+					}
+
+					#adjust tooltip position relativelly to column number
+					if (($fieldNbr+1) <= ($OutColCounter/2)){
+						if (($fieldNbr+1) == 1){
+							$alignTooltiptext = "style=\"visibility: hidden; min-width: 1px; max-width: 1px;height: 300px; left: 1% ;background-color: rgba(0,0,0,0); \"";
+						}else{
+							$alignTooltiptext = "style=\"left: 75%\"";
+						}
+					}else{
+						$alignTooltiptext = "style=\"right: 75%\"";
+					}
+
+					# add filed value in the tooltip (except for special benign and patho fields
+					if ($OutColHash{$fieldNbr + 1}{'field'} =~ /^[BP]_/){
+						$htmlALL .= "<span ".$alignTooltiptext." class=\"tooltiptext tooltip-bottom\">";
+					}else{
+						#add <br> before AnnotSV ID
+						if($fieldNbr eq $NameColHash{'AnnotSV_ID'} - 1){
+							$htmlALL .= "<span ".$alignTooltiptext." class=\"tooltiptext tooltip-bottom\"></span></div>\t</td>\n";
+							next;
+						}else{
+							$htmlALL .= "<span ".$alignTooltiptext." class=\"tooltiptext tooltip-bottom\"><span class=\"commentTitle\">".$OutColHash{$fieldNbr + 1}{'field'}. " :</span> ".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr];
+						}
+					}
+					# add comments
+					if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashComments'}{$fieldNbr}){
+						$htmlALL .= $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashComments'}{$fieldNbr}."</span></div>";   
+					}else{
+					$htmlALL .= "</span></div>";
+					}
+
+				#	$hashFinalSortData{$rank}{$variant}{'hashComments'}{$NameColHash{$fieldCom}} 
+
+				}else {
+					#print HTML "."
+					$htmlALL .= "."
+				}
+				#print HTML "\t</td>\n";
+				$htmlALL .= "\t</td>\n";
+			} #END FOR FULL+SPLIT tab
+
+
+			#end of table line
+			$htmlALL .= "</tr>\n";
+	
+	
 			}   # END FOREACH VARIANT
-
-
 		}   # END FOREACH RANKSPLIT
 	}   # END FOREACH ID
 }	#END FOREACH RANK
 
 
-$htmlStart .= "\n\t\t\t\t\t]\n\t\t\t\t}\n\t\t\t},\n";
-
-$htmlStart .= "],
-    });    
-});
-
-const fullToCollapse = [".$fullToCollapse."]; 
- 
-\n</script>
-</html>";
-
 
 close(VCF);
 
-open(HTML, '>', $outDir."/".$outPrefix.$outBasename.".html") or die $!;
+
 
 #Write in HTML file
 print HTML $htmlStart;
+print HTML $htmlALL;
+print HTML $htmlEndTable;
+print HTML $htmlEnd;
+
 
 close(HTML);
 
+
+
+
 print STDERR "\n\n\nDone!\n\n\n";
+
+
+
 
 
 exit 0; 
