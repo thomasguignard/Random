@@ -430,34 +430,34 @@ $dicoLOEUFformatColor{'.'} = '#FFFFFF';
 
 my $worksheet = $workbook->add_worksheet('ALL_'.$popFreqThr);
 $worksheet->freeze_panes( 1, 0 );    # Freeze the first row
-my $worksheetLine = 0;
+my $worksheetLine = 1;
 
 $tagsHash{'ACMG'}{'label'} = "DS_ACMG" ; 
 $tagsHash{'ACMG'}{'count'} = 0 ; 
 my $worksheetACMG = $workbook->add_worksheet('DS_ACMG');
 $worksheetACMG->freeze_panes( 1, 0 );    # Freeze the first row
-my $worksheetLineACMG = 0;
+my $worksheetLineACMG = 1;
 
 # Meta Data worksheet
 $tagsHash{'META'}{'label'}  = "METADATA" ; 
 $tagsHash{'META'}{'count'}  = 1 ; 
 my $worksheetMETA = $workbook->add_worksheet('META');
 $worksheetMETA->freeze_panes( 1, 0 );    # Freeze the first row
-my $worksheetLineMETA = 0;
+my $worksheetLineMETA = 1;
 
 # OMIM worksheets
 $tagsHash{'OMIMDOM'}{'label'} = 'OMIM_DOM' ; 
 $tagsHash{'OMIMDOM'}{'count'} = 0 ; 
 my $worksheetOMIMDOM = $workbook->add_worksheet('OMIM_DOM');
 $worksheetOMIMDOM->freeze_panes( 1, 0 );    # Freeze the first row
-my $worksheetLineOMIMDOM = 0;
+my $worksheetLineOMIMDOM = 1;
 
 # OMIM worksheets
 $tagsHash{'OMIMREC'}{'label'} = 'OMIM_REC' ; 
 $tagsHash{'OMIMREC'}{'count'} = 0 ; 
 my $worksheetOMIMREC = $workbook->add_worksheet('OMIM_REC');
 $worksheetOMIMREC->freeze_panes( 1, 0 );    # Freeze the first row
-my $worksheetLineOMIMREC = 0;
+my $worksheetLineOMIMREC = 1;
 
 #Worksheets initialization
 
@@ -469,12 +469,12 @@ my $worksheetDENOVO;
 my $worksheetCandidats;
 #my $worksheetDELHMZ;
 
-my $worksheetLineHTZcompo ;
-my $worksheetLineAR ; 
-my $worksheetLineSNPmumVsCNVdad ;
-my $worksheetLineSNPdadVsCNVmum ;
-my $worksheetLineDENOVO ;
-my $worksheetLineCandidats;
+my $worksheetLineHTZcompo = 1 ;
+my $worksheetLineAR = 1 ; 
+my $worksheetLineSNPmumVsCNVdad = 1 ;
+my $worksheetLineSNPdadVsCNVmum = 1;
+my $worksheetLineDENOVO = 1;
+#my $worksheetLineCandidats;
 #my $worksheetLineDELHMZ;
 
 #create additionnal sheet in trio analysis
@@ -483,31 +483,26 @@ if (defined $trio){
 	$tagsHash{'DENOVO'}{'label'} = 'DENOVO' ; 
 	$tagsHash{'DENOVO'}{'count'} = 0 ; 
 	$worksheetDENOVO = $workbook->add_worksheet('DENOVO');
-	$worksheetLineDENOVO = 0;
 	$worksheetDENOVO->freeze_panes( 1, 0 );    # Freeze the first row
 
 	$tagsHash{'AUTOREC'}{'label'} = 'AR' ; 
 	$tagsHash{'AUTOREC'}{'count'} = 0 ; 
 	$worksheetAR = $workbook->add_worksheet('AR');
-	$worksheetLineAR = 0;
 	$worksheetAR->freeze_panes( 1, 0 );    # Freeze the first row
   
 	$tagsHash{'HTZcompo'}{'label'} = 'HTZ_compo' ; 
 	$tagsHash{'HTZcompo'}{'count'} = 0 ; 
 	$worksheetHTZcompo = $workbook->add_worksheet('HTZ_compo');
-	$worksheetLineHTZcompo = 0;
 	$worksheetHTZcompo->freeze_panes( 1, 0 );    # Freeze the first row
 
 	$tagsHash{'SNPmCNVp'}{'label'} = 'SNVmumVsCNVdad' ; 
 	$tagsHash{'SNPmCNVp'}{'count'} = 0 ; 
 	$worksheetSNPmumVsCNVdad = $workbook->add_worksheet('SNVmumVsCNVdad');
-	$worksheetLineSNPmumVsCNVdad = 0;
 	$worksheetSNPmumVsCNVdad->freeze_panes( 1, 0 );    # Freeze the first row
   
 	$tagsHash{'SNPpCNVm'}{'label'} = 'SNVdadVsCNVmum' ; 
 	$tagsHash{'SNPpCNVm'}{'count'} = 0 ; 
 	$worksheetSNPdadVsCNVmum = $workbook->add_worksheet('SNVdadVsCNVmum');
-	$worksheetLineSNPdadVsCNVmum = 0;
 	$worksheetSNPdadVsCNVmum->freeze_panes( 1, 0 );    # Freeze the first row
   
 
@@ -521,13 +516,11 @@ if (defined $trio){
 	$tagsHash{'DENOVO'}{'label'} = 'DOM' ; 
 	$tagsHash{'DENOVO'}{'count'} = 0 ; 
 	$worksheetDENOVO = $workbook->add_worksheet('DOM');
-	$worksheetLineDENOVO = 0;
 	$worksheetDENOVO->freeze_panes( 1, 0 );    # Freeze the first row
 
 	$tagsHash{'AUTOREC'}{'label'} = 'REC' ; 
 	$tagsHash{'AUTOREC'}{'count'} = 0 ; 
 	$worksheetAR = $workbook->add_worksheet('REC');
-	$worksheetLineAR = 0;
 	$worksheetAR->freeze_panes( 1, 0 );    # Freeze the first row
 	
 	if ( @affectedArray){
@@ -540,7 +533,6 @@ if (defined $trio){
 		$tagsHash{'SNPmCNVp'}{'count'} = 0 ; 
 		$worksheetSNPmumVsCNVdad = $workbook->add_worksheet('HMZonly');
 	}
-	$worksheetLineSNPmumVsCNVdad = 0;
 	$worksheetSNPmumVsCNVdad->freeze_panes( 1, 0 );    # Freeze the first row
 
 }
@@ -620,6 +612,9 @@ if ($filterCustomVCFRegex eq ""){
 
 #create sheet for candidats
 my $CANDID_TAG = "CANDIDATES";
+
+my %candidWorksheetHash ;
+
 if($candidates ne ""){
 	open( CANDIDATS , "<$candidates")or die("Cannot open candidates file ".$candidates) ;
 	print  STDERR "Processing candidates file ... \n" ; 
@@ -632,16 +627,32 @@ if($candidates ne ""){
 			$CANDID_TAG = "CANDID_".$candidates_line;
 			$tagsHash{"CANDID_".$candidates_line}{'label'} = $candidates_line; 
 			$tagsHash{"CANDID_".$candidates_line}{'count'} = 0; 
+
+			#create 1 excel worksheet for each pathology (with # prefixed line)
+			$candidWorksheetHash{$candidates_line}{'workbook'} = $workbook->add_worksheet($candidates_line);
+			$candidWorksheetHash{$candidates_line}{'workbook'}->freeze_panes( 1, 0 );
+			$candidWorksheetHash{$candidates_line}{'line'} = 0;
 	
 			next;
 		}
+
 		$candidateGene{$candidates_line} .= " ".$CANDID_TAG;
 
 				
 	}
 	close(CANDIDATS);
-	$worksheetCandidats = $workbook->add_worksheet('Candidats');
-	$worksheetCandidats->freeze_panes( 1, 0 );    # Freeze the first row
+	#$worksheetCandidats = $workbook->add_worksheet('Candidats');
+	#$worksheetCandidats->freeze_panes( 1, 0 );    # Freeze the first row
+
+	# create a generic "candidates" excel worksheet if no disease is given with #
+	if( keys %candidWorksheetHash == 0 ){
+		$candidWorksheetHash{'Candidats'}{'workbook'} = $workbook->add_worksheet('Candidates');
+		$candidWorksheetHash{'Candidats'}{'workbook'}->freeze_panes( 1, 0 ); # Freeze the first row
+		$candidWorksheetHash{'Candidats'}{'line'} = 0;
+
+		$tagsHash{"CANDIDATES"}{'label'} = "Candidates"; 
+		$tagsHash{"CANDIDATES"}{'count'} = 0; 
+	}
 }
 
 
@@ -1040,8 +1051,16 @@ $worksheetSNPmumVsCNVdad->write_comment(0, $dicoColumnNbr{'Gene.'.$refGene}, $pL
 #FILLING COLUMN TITLES FOR CANDIDATES SHEET
 
 if($candidates ne ""){
-	$worksheetCandidats->write_row( 0, 0, \@columnTitles );
-	$worksheetCandidats->write_comment(0, $dicoColumnNbr{'Gene.'.$refGene}, $pLI_Comment,  x_scale => 3 );
+	foreach my $patho (keys %candidWorksheetHash){
+
+		
+		$candidWorksheetHash{$patho}{'workbook'}->write_row( 0, 0, \@columnTitles );
+		$candidWorksheetHash{$patho}{'workbook'}->write_comment(0, $dicoColumnNbr{'Gene.'.$refGene}, $pLI_Comment,  x_scale => 3 );
+		$candidWorksheetHash{$patho}{'line'} = 1 ;
+
+		#$worksheetCandidats->write_row( 0, 0, \@columnTitles );
+		#$worksheetCandidats->write_comment(0, $dicoColumnNbr{'Gene.'.$refGene}, $pLI_Comment,  x_scale => 3 );
+	}
 }
 
 
@@ -1107,34 +1126,9 @@ while( <VCF> ){
 #			foreach my $name (@sampleList)
 				#if($line[$sampleIndex]
 				
-			
 		}	
 	
     
-
-######### Increase row number 
-	    	$worksheetLine ++;
-	    	$worksheetLineACMG ++;
-	    	$worksheetLineOMIMDOM ++;
-	    	$worksheetLineOMIMREC ++;
-
-		if (defined $trio){
-
-			$worksheetLineHTZcompo ++;
-			$worksheetLineHTZcompo ++;
-			$worksheetLineSNPdadVsCNVmum ++;
-		
-		}
-		$worksheetLineAR ++; 
-		$worksheetLineSNPmumVsCNVdad ++;
-		$worksheetLineDENOVO ++;
-
-		
-
-		if($candidates ne ""){
-			$worksheetLineCandidats ++;
-		}
-
 
 		next;
 		
@@ -1749,7 +1743,7 @@ while( <VCF> ){
 
 				#$commentGenotype .=  $dicoSamples{$finalcol}{'columnName'}."\t -\t ".$genotype[$formatIndex{'GT'}]."\nDP = ".$DP."\t AD = ".$AD."\t AB = ".$AB."\n\n";
 				
-				
+				# POOL samples treatment, change genotype 0/0 to 0/1 if ALT depth > 1 , give yellow color to the changed sample genotype
 				if (defined $hashPooledSamples{substr($dicoSamples{$finalcol}{'columnName'},9,length($dicoSamples{$finalcol}{'columnName'})-9) }){
 					
 					if ($genotype[$formatIndex{'GT'}] eq "0/0" && $adalt > 1){
@@ -2034,10 +2028,12 @@ while( <VCF> ){
 				if(defined $candidateGene{$geneName} ){
 					#$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'worksheet'} .= "#CANDIDATES";
 					$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'worksheet'} .=    " ".$candidateGene{$geneName};		
-					
-                	my @pathoTAG = split( ' ', $candidateGene{$geneName} );    
+					#print 	" ".$candidateGene{$geneName}."\n";	
+                	
+					my @pathoTAG = split( ' ', $candidateGene{$geneName} );    
 					for(my $i=0; $i < scalar @pathoTAG; $i ++){
-						 $tagsHash{$pathoTAG[$i]}{'count'} ++;
+						$tagsHash{$pathoTAG[$i]}{'count'} ++;
+						#print $pathoTAG[$i]."__________\n";
 					}
 				}
 				
@@ -2736,10 +2732,15 @@ $htmlALL .= "</tr>\n";
 ##############################################################
 ################ CANDIDATES #############
 
-		if( $hashFinalSortData{$rank}{$variant}{'worksheet'} =~ /CANDID/){
 
-			writeThisSheet ($worksheetCandidats,
-							$worksheetLineCandidats,
+
+	foreach my $patho (keys %candidWorksheetHash){
+
+		if( $hashFinalSortData{$rank}{$variant}{'worksheet'} =~ / CANDID_$patho| CANDIDATES/    ){
+			#	if( $hashFinalSortData{$rank}{$variant}{'worksheet'} =~ /CANDID/){
+
+			writeThisSheet ($candidWorksheetHash{$patho}{'workbook'},
+							$candidWorksheetHash{$patho}{'line'}, 
 							$format_pLI,
 							$case,
 							$hashTemp,
@@ -2747,9 +2748,10 @@ $htmlALL .= "</tr>\n";
 						);
 			
 			
-			$worksheetLineCandidats ++;
+
+			$candidWorksheetHash{$patho}{'line'} ++; 
 		}
-	
+	}	
 		
 
 
@@ -2873,6 +2875,8 @@ if(defined $trio){
 $worksheetMETA->write( 4, 0, "Arguments:" );
 $worksheetMETA->write( 5, 0, $achabArg );
 
+# write IDSNP
+$worksheetMETA->write( 6, 0, $hashIDSNP{$finalSortData[$dicoColumnNbr{'ID'}]} );
 
 #write vcf Header 
 $worksheetMETA->write( 7, 0, "VCF Header:" );
@@ -2887,9 +2891,11 @@ $worksheetDENOVO->autofilter('A1:Z'.$worksheetLineDENOVO); # Add autofilter
 
 
 if($candidates ne ""){
-			$worksheetCandidats->autofilter('A1:Z'.$worksheetLineCandidats);
-}
-
+	foreach my $patho (keys %candidWorksheetHash){
+		my $toto = $candidWorksheetHash{$patho}{'workbook'};
+		$candidWorksheetHash{$patho}{'workbook'}->autofilter('A1:Z'.$candidWorksheetHash{$patho}{'line'});
+	 }
+ }
 
 
 
