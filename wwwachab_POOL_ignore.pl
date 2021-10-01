@@ -571,6 +571,7 @@ if (defined $trio){
 #get data from phenolyzer output (predicted_gene_score)
 my $current_gene= "";
 my $maxLine=0;
+my $geneCounter=1;
 if($phenolyzerFile ne ""){
 	open(PHENO , "<$phenolyzerFile") or die("Cannot open phenolyzer file ".$phenolyzerFile) ;
 	print  STDERR "Processing phenolyzer file ... \n" ; 
@@ -589,6 +590,9 @@ if($phenolyzerFile ne ""){
 			$phenolyzerGene{$current_gene}{'Raw'}= $phenolyzer_List[2];
 			$phenolyzerGene{$current_gene}{'comment'}= $phenolyzer_List[1]."\n".$phenolyzer_List[3]."\n";
 			$phenolyzerGene{$current_gene}{'normalized'}= $phenolyzer_List[3];
+			$phenolyzerGene{$current_gene}{'rank'}= $geneCounter;
+			$geneCounter ++;
+
 			$maxLine=0;
 
 		}else{	
@@ -603,7 +607,7 @@ if($phenolyzerFile ne ""){
 
 if($customVCF_File ne ""){
 	
-	open(CUSTOMVCF , "<$customVCF_File") or die("Cannot open phenolyzer file ".$customVCF_File) ;
+	open(CUSTOMVCF , "<$customVCF_File") or die("Cannot open customVCF file ".$customVCF_File) ;
 	print  STDERR "Processing custom VCF file ... \n" ; 
 	while( <CUSTOMVCF> ){
 
@@ -1340,14 +1344,16 @@ while( <VCF> ){
 				if (defined $phenolyzerGene{$geneName} ){
 					if( ! defined $finalSortData[$dicoColumnNbr{'Phenolyzer'}]){
 						$finalSortData[$dicoColumnNbr{'Phenolyzer'}] = $phenolyzerGene{$geneName}{'Raw'};
-					}elsif($phenolyzerGene{$geneName}{'Raw'} > $finalSortData[$dicoColumnNbr{'Phenolyzer'}]){
+					}elsif( $finalSortData[$dicoColumnNbr{'Phenolyzer'}] eq "." || ( $phenolyzerGene{$geneName}{'Raw'} ne "." &&   $phenolyzerGene{$geneName}{'Raw'} > $finalSortData[$dicoColumnNbr{'Phenolyzer'}])){
 						$finalSortData[$dicoColumnNbr{'Phenolyzer'}] = $phenolyzerGene{$geneName}{'Raw'};
 						
-						if($phenoScoreMax < $phenolyzerGene{$geneName}{'normalized'}){
-							$phenoScoreMax = $phenolyzerGene{$geneName}{'normalized'};
+						if($phenoScoreMax < $phenolyzerGene{$geneName}{'Raw'}){
+							$phenoScoreMax = $phenolyzerGene{$geneName}{'Raw'};
 						}
 					}
 				
+				}else{
+					$finalSortData[$dicoColumnNbr{'Phenolyzer'}] = ".";
 				}
 
 			}
@@ -1358,7 +1364,7 @@ while( <VCF> ){
 		}else{
 			$finalSortData[$dicoColumnNbr{'Phenolyzer'}] = ".";
 		}
-
+#
 		#CNV GENES
 		if($cnvGeneList ne ""){
 	
@@ -2889,41 +2895,70 @@ $worksheet->autofilter('A1:Z'.$worksheetLine); # Add autofilter until the end
 $worksheetOMIMDOM->autofilter('A1:Z'.$worksheetLineOMIMDOM); # Add autofilter until the end
 $worksheetOMIMREC->autofilter('A1:Z'.$worksheetLineOMIMREC); # Add autofilter until the end
 
+
+my $metadataLine = 1;
+
 if(defined $trio){
 
 	$worksheetHTZcompo->autofilter('A1:Z'.$worksheetLineHTZcompo); # Add autofilter
 	$worksheetSNPdadVsCNVmum->autofilter('A1:Z'.$worksheetLineSNPdadVsCNVmum); # Add autofilter
  
+	
+	#check inheritance consistency and add to METADATA
  	if ( $dadVariant > 0 && $mumVariant > 0 && $caseDadVariant > 0 && $caseMumVariant > 0){
 
-		#check inheritance consistency
 		if ( log($caseDadVariant/$dadVariant) / log(10) < 0.1 ){
-			$worksheetMETA->write( 1, 0, "Dad status : OK (log10(".$caseDadVariant."/".$dadVariant.") < 0.1), Inherited Heterozygous variants Ratio tends toward 0." );
+			$worksheetMETA->write($metadataLine , 0, "Dad status : OK (log10(".$caseDadVariant."/".$dadVariant.") < 0.1), Inherited Heterozygous variants Ratio tends toward 0." );
 		}else{
-			$worksheetMETA->write( 1, 0, "Dad status : BAD (log10(".$caseDadVariant."/".$dadVariant.") > 0.1), Inherited Heterozygous variants Ratio tends toward 0." );
+			$worksheetMETA->write($metadataLine , 0, "Dad status : BAD (log10(".$caseDadVariant."/".$dadVariant.") > 0.1), Inherited Heterozygous variants Ratio tends toward 0." );
 		}
 
+		$metadataLine ++;
+
 		if ( log($caseMumVariant/$mumVariant) / log(10) < 0.1 ){
-			$worksheetMETA->write( 2, 0, "Mum status : OK (log10(".$caseMumVariant."/".$mumVariant.") < 0.1), Inherited Heterozygous variants Ratio tends toward 0." );
+			$worksheetMETA->write($metadataLine , 0, "Mum status : OK (log10(".$caseMumVariant."/".$mumVariant.") < 0.1), Inherited Heterozygous variants Ratio tends toward 0." );
 		}else{
-			$worksheetMETA->write( 2, 0, "Mum status : BAD (log10(".$caseMumVariant."/".$mumVariant.") > 0.1), Inherited Heterozygous variants Ratio tends toward 0." );
+			$worksheetMETA->write($metadataLine , 0, "Mum status : BAD (log10(".$caseMumVariant."/".$mumVariant.") > 0.1), Inherited Heterozygous variants Ratio tends toward 0." );
 		}
+
+		$metadataLine ++;
 	}
 
 } 
 
 
 #write arguments
-$worksheetMETA->write( 4, 0, "Arguments:" );
-$worksheetMETA->write( 5, 0, $achabArg );
+$worksheetMETA->write($metadataLine , 0, "Arguments:" );
+$metadataLine ++;
+$worksheetMETA->write($metadataLine , 0, $achabArg );
+$metadataLine ++;
 
 # write IDSNP
-$worksheetMETA->write( 6, 0, $hashIDSNP{$finalSortData[$dicoColumnNbr{'ID'}]} );
+$worksheetMETA->write( $metadataLine, 0, $hashIDSNP{$finalSortData[$dicoColumnNbr{'ID'}]} );
+$metadataLine ++;
+
+#write top 100 genes scored by phenolyzer
+if (%phenolyzerGene){
+	$worksheetMETA->write( $metadataLine, 0, "TOP 50 Genes scored by phenolyzer:" );
+	$metadataLine ++;
+
+	my @phenoSort = sort { $phenolyzerGene{$a}{'rank'}<=>  $phenolyzerGene{$b}{'rank'}  } keys %phenolyzerGene ; 
+	for ( my $i=0; $i <= 50; $i++){
+		if ($i == scalar @phenoSort){
+			last;
+		}
+		$worksheetMETA->write( $metadataLine, 0, $phenoSort[$i]);
+		$worksheetMETA->write( $metadataLine, 1, $phenolyzerGene{$phenoSort[$i]}{'Raw'});
+		$metadataLine ++;
+	}
+	$metadataLine ++;
+}
 
 #write vcf Header 
-$worksheetMETA->write( 7, 0, "VCF Header:" );
-$worksheetMETA->write( 8, 0, $vcfHeader );
-
+$worksheetMETA->write( $metadataLine, 0, "VCF Header:" );
+$metadataLine ++;
+$worksheetMETA->write( $metadataLine , 0, $vcfHeader );
+$metadataLine ++;
 
 
 $worksheetSNPmumVsCNVdad->autofilter('A1:Z'.$worksheetLineSNPmumVsCNVdad); # Add autofilter
