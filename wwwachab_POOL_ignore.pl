@@ -42,7 +42,8 @@ my $man = "USAGE : \nperl achab.pl
 \n--filterCustomVCFRegex <string pattern used as regex to search for a specific field to filter customVCF (default key of info field : 'found=')  >
 \n--pooledSamples <comma separated list of samples that are pooled (e.g. parents pool in trio context)  >
 \n--IDSNP <comma separated list of rs ID for identity monitoring (e.g. rs4889990,rs2075559)  >
-\n--sampleSubset <comma separated list of samples only processed by Achab in the output>";
+\n--sampleSubset <comma separated list of samples only processed by Achab in the output>
+\n--addCaseDepth (case Depth will be added in a new column) \n";
 
 
 #################################### VARIABLES INIT ########################
@@ -148,6 +149,9 @@ my %hashIDSNP;
 my $sampleSubset = "";
 my @sampleSubsetArray;
 
+#add case Depth in a new column
+my $addCaseDepth; 
+
 # METADATA
 
 # inheritance checking test
@@ -187,6 +191,7 @@ GetOptions( 	"vcf=s"				=> \$incfile,
 		"pooledSamples:s"	=>	\$pooledSamples,
 		"IDSNP:s"	=>	\$IDSNP,
 		"sampleSubset:s"		=> \$sampleSubset,		
+		"addCaseDepth"		=> \$addCaseDepth,		
 		"help|h"			=> \$help);
 				
 				
@@ -865,6 +870,13 @@ $dicoColumnNbr{'FILTER'}=	16+$cmpt ;
 #Add custom Info in additionnal columns
 my $lastColumn = 17+$cmpt; 
 
+# add case depth
+if($case ne "" && defined $addCaseDepth){
+	$dicoColumnNbr{'Case Depth'} = $lastColumn ;
+	$lastColumn++;
+}
+
+
 if($customInfoList ne ""){
 	chomp $customInfoList;
 	@custInfList = split(/,/, $customInfoList);
@@ -873,6 +885,7 @@ if($customInfoList ne ""){
 		$lastColumn++;
 	}
 }
+
 
 #add favorite gene references into a new column 
 if($favouriteGeneRef ne ""){
@@ -891,7 +904,7 @@ if($customVCF_File ne ""){
 
 #TODO add a last column to flag newHope variants
 if(defined $newHope){
-	$dicoColumnNbr{'Variant_Class'} = $lastColumn ;
+	$dicoColumnNbr{'Catch_Class'} = $lastColumn ;
 	$lastColumn++;
 }
 
@@ -1269,9 +1282,9 @@ while( <VCF> ){
 			#next if($dicoInfo{'MPA_ranking'} < 8 );
 
 			if ($filterBool == 1 or $dicoInfo{'MPA_ranking'} == 10){
-				$finalSortData[$dicoColumnNbr{'Variant_Class'}] = "New_Hope";	
+				$dicoInfo{'Catch_Class'} = "New_Hope";	
 			}else{
-				$finalSortData[$dicoColumnNbr{'Variant_Class'}] = "Main_Catch";	
+				$dicoInfo{'Catch_Class'} = "Main";	
 			}
 
 		}else{
@@ -1663,7 +1676,7 @@ while( <VCF> ){
 				my $AD;		#Final Allelic Depth
 
 
-				#if (scalar @genotype > 1 && $caller ne ""){
+				#if (scalar @genotype > 1 && $caller ne "")
 				if ($caller ne "unknown"){
 
 					if(	($caller eq "GATK" ) || ($caller eq "DeepVariant")){
@@ -1756,6 +1769,7 @@ while( <VCF> ){
 				}
 
 
+
 				#DEBUG print STDERR "indexSample\t".$dicoSamples{$finalcol}{'columnIndex'}."\n";
 
 				#put the genotype and comments info into string
@@ -1818,6 +1832,11 @@ while( <VCF> ){
 					}
 				}
 
+				# add depth (DP) of the Case in supplementary column
+				if ($case ne "" && $dicoSamples{$finalcol}{'columnName'} eq "Genotype-".$case){
+					$finalSortData[$dicoColumnNbr{'Case Depth'}] = $DP;
+
+				}
 
 
 				$finalSortData[$dicoColumnNbr{$dicoSamples{$finalcol}{'columnName'}}] = $genotype[$formatIndex{'GT'}];
@@ -2571,7 +2590,7 @@ $htmlEnd .= "\n</body>\n</html>";
 
 my $newHopePrefix = "";
 if(defined $newHope){
-	$newHopePrefix = "_newHope_";
+	$newHopePrefix = "newHope_";
 }
 
 
