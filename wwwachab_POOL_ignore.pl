@@ -2,7 +2,7 @@
 
 ##### achab.pl ####
 
-# Author : Thomas Guignard 2018
+# Author : Thomas Guignard 2021
 
 # Description : 
 # Create an User friendly Excel file from an MPA annotated VCF file. 
@@ -43,7 +43,10 @@ my $man = "USAGE : \nperl achab.pl
 \n--pooledSamples <comma separated list of samples that are pooled (e.g. parents pool in trio context)  >
 \n--IDSNP <comma separated list of rs ID for identity monitoring (e.g. rs4889990,rs2075559)  >
 \n--sampleSubset <comma separated list of samples only processed by Achab in the output>
-\n--addCaseDepth (case Depth will be added in a new column) \n";
+\n--addCaseDepth (case Depth will be added in a new column) 
+\n--intersectVCF <VCF format File for comparison (if variant matches then 'yes' will be added in new 'intersectVCF' column) > 
+\n--poorCoverageFile <poor Coverage File (it will annotate OMIM genes -requires OMIM genemap2 File- and create an excel file )> 
+\n--genemap2File <OMIM genemap2 file (it will help to annotate OMIM genes in poor coverage file )> \n";
 
 
 #################################### VARIABLES INIT ########################
@@ -101,6 +104,11 @@ my %customVCF_variant;
 my $filterCustomVCF = "";
 my $filterCustomVCFRegex = "";
 
+my $intersectVCF_File = "";
+my $intersectVCF_Line;
+my @intersectVCF_List;
+my %intersectVCF_variant;
+
 #vcf parsing and output
 my @line;
 my $variantID; 
@@ -152,6 +160,18 @@ my @sampleSubsetArray;
 #add case Depth in a new column
 my $addCaseDepth; 
 
+#Poor coverage File and omim genemap2 file
+my $genemap2_File = "";
+my $genemap2_Line;
+my @genemap2_List;
+my %genemap2_variant;
+
+my $poorCoverage_File = "";
+my $poorCoverage_Line;
+my @poorCoverage_List;
+my %poorCoverage_variant;
+
+
 # METADATA
 
 # inheritance checking test
@@ -192,6 +212,9 @@ GetOptions( 	"vcf=s"				=> \$incfile,
 		"IDSNP:s"	=>	\$IDSNP,
 		"sampleSubset:s"		=> \$sampleSubset,		
 		"addCaseDepth"		=> \$addCaseDepth,		
+		"intersectVCF:s"	=> \$intersectVCF_File,
+		"poorCoverageFile:s"	=> \$poorCoverage_File,
+		"genemap2File:s"	=> \$genemap2_File,
 		"help|h"			=> \$help);
 				
 				
@@ -604,7 +627,7 @@ if($phenolyzerFile ne ""){
 	close(PHENO);
 } 
 
-
+#custom VCF treatment 
 if($customVCF_File ne ""){
 	
 	open(CUSTOMVCF , "<$customVCF_File") or die("Cannot open customVCF file ".$customVCF_File) ;
@@ -634,12 +657,54 @@ if($customVCF_File ne ""){
 			$customVCF_variant{$customVCF_List[0]."_".$customVCF_List[1]."_".$customVCF_List[3]."_".$customVCF_List[4]} = $customVCF_List[7];
 		}
 	}
+
+	close(CUSTOMVCF);
 }
 
 #Initialize Regex for filtering customVCF  (should be like that "wantedKey=" )
 if ($filterCustomVCFRegex eq ""){
 	$filterCustomVCFRegex = "found=";
 }else{chomp $filterCustomVCFRegex ;} 
+
+
+# intersect VCF treatment
+if($intersectVCF_File ne ""){
+	
+	open(INTERSECTVCF , "<$intersectVCF_File") or die("Cannot open intersectVCF file ".$intersectVCF_File) ;
+	print  STDERR "Processing intersect VCF file ... \n" ; 
+	while( <INTERSECTVCF> ){
+
+  		$intersectVCF_Line = $_;
+
+#############################################
+##############   skip header
+		next if ($intersectVCF_Line=~/^#/);
+
+		chomp $intersectVCF_Line;
+		@intersectVCF_List = split( /\t/, $intersectVCF_Line );	
+		
+		#replace "spaces" by "_"
+		#$intersectVCF_List[7] =~ s/ /_/g;
+
+		#build variant key as CHROM_POS_REF_ALT
+
+		if (defined $intersectVCF_variant{$intersectVCF_List[0]."_".$intersectVCF_List[1]."_".$intersectVCF_List[3]."_".$intersectVCF_List[4]}){
+		
+			#$intersectVCF_variant{$intersectVCF_List[0]."_".$intersectVCF_List[1]."_".$intersectVCF_List[3]."_".$intersectVCF_List[4]} = "yes";
+
+		}else{	
+
+			$intersectVCF_variant{$intersectVCF_List[0]."_".$intersectVCF_List[1]."_".$intersectVCF_List[3]."_".$intersectVCF_List[4]} = "yes";
+		}
+	}
+	close(INTERSECTVCF);
+}
+
+
+
+
+
+
 
 
 #create sheet for candidats
@@ -902,6 +967,13 @@ if($favouriteGeneRef ne ""){
 #custom VCF in last position
 if($customVCF_File ne ""){
 	$dicoColumnNbr{'customVCFannotation'} = $lastColumn ;
+	$lastColumn++;
+}
+
+
+#intersect VCF in last position
+if($intersectVCF_File ne ""){
+	$dicoColumnNbr{'intersectVCFannotation'} = $lastColumn ;
 	$lastColumn++;
 }
 
@@ -1653,6 +1725,18 @@ while( <VCF> ){
 				$finalSortData[$dicoColumnNbr{'customVCFannotation'}] = ".";
 			}
 		}
+
+		#CHECK IF variant is in intersectVCF
+		if($intersectVCF_File ne ""){
+		
+			if( defined $intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}){
+				$finalSortData[$dicoColumnNbr{'intersectVCFannotation'}] = "yes";
+
+			}else{
+				$finalSortData[$dicoColumnNbr{'customVCFannotation'}] = "no";
+			}
+		}
+
 
 
 
@@ -2989,6 +3073,119 @@ print HTML $htmlEnd;
 
 
 close(HTMl);
+
+###############   ENd of VCF processing #####################
+#
+#
+
+
+
+# Create a new Excel workbook for poor coverage
+#
+#
+
+my $workbookCoverage;
+
+if ($outDir eq "." || -d $outDir) {
+		$workbookCoverage = Excel::Writer::XLSX->new( $outDir."/".$outPrefix."poorCoverage.xlsx" );
+}else {
+ 	die("No directory $outDir");
+}
+
+# Add all worksheets
+
+my $worksheetCoverage = $workbookCoverage->add_worksheetCoverage('poor cov');
+$worksheetCoverage->freeze_panes( 1, 0 );    # Freeze the first row
+my $worksheetCoverageLine = 0;
+
+
+#poor coverage and genemap2 treatment 
+if ($poorCoverage_File ne "" &&  $genemap2_File ne ""  ){
+	
+
+	open(GENEMAP2 , "<$genemap2_File") or die("Cannot open poorCoverage file ".$genemap2_File) ;
+	print  STDERR "Processing genemap2 file ... \n" ; 
+
+	while( <GENEMAP2> ){
+
+  		$genemap2_Line = $_;
+
+#############################################
+##############   skip header
+		next if ($genemap2_Line=~/^#/);
+
+		chomp $genemap2_Line;
+		@genemap2_List = split( /\t/, $genemap2_Line );	
+
+		if ($genemap2_List[11] ne ""){
+			if (defined $genemap2_variant{$genemap2_List[8]}){
+				$genemap2_variant{$genemap2_List[8]} .= ";".$genemap2_List[11];
+
+			}else{	
+				$genemap2_variant{$genemap2_List[8]} = $genemap2_List[11];
+			}
+		}
+		close(GENEMAP2);
+	}
+
+
+	open(POORCOV , "<$poorCoverage_File") or die("Cannot open poorCoverage file ".$poorCoverage_File) ;
+	print  STDERR "Processing poorCoverage file ... \n" ; 
+	
+	while( <POORCOV> ){
+
+  		$poorCoverage_Line = $_;
+
+#############################################
+##############   skip header
+		chomp $poorCoverage_Line;
+		
+		@poorCoverage_List = split( /\t/, $poorCoverage_Line );	
+		
+		if ($poorCoverage_Line=~/^#/){
+			push @poorCoverage_List, "OMIM";
+		}else{
+
+			#add OMIM phenotypes if exists
+			if (defined $genemap2_variant{$poorCoverage_List[7]}){
+			
+				push @poorCoverage_List, $genemap2_variant{$poorCoverage_List[7]} ; 
+
+			}else{	
+
+				push @poorCoverage_List, "." ; 
+			}
+		}
+
+		$worksheetCoverage->write_row($worksheetCoverageLine , 0, \@poorCoverage_List );
+		$worksheetCoverageLine ++;
+		
+	}
+
+	close(POORCOV);
+}
+
+
+
+
+
+
+
+
+
+
+
+#############add autofilters within the sheets
+
+$worksheetCoverage->autofilter('A1:Z'.$worksheetCoverageLine); # Add autofilter until the end
+
+
+
+
+
+
+
+
 
 print STDERR "Done!\n\n\n";
 
