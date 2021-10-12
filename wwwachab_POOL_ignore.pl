@@ -3156,10 +3156,10 @@ if ($poorCoverage_File ne "" &&  $genemap2_File ne ""  ){
 			push @poorCoverage_List, "OMIM";
 		}else{
 
-			#add OMIM phenotypes if exists
-			if (defined $genemap2_variant{$poorCoverage_List[7]}){
+			#add OMIM phenotypes if exists => Assuming that gene name is in 4th column of poor coverage
+			if (defined $genemap2_variant{$poorCoverage_List[3]}){
 			
-				push @poorCoverage_List, $genemap2_variant{$poorCoverage_List[7]} ; 
+				push @poorCoverage_List, $genemap2_variant{$poorCoverage_List[3]} ; 
 
 			}else{	
 
