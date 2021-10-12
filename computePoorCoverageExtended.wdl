@@ -23,13 +23,13 @@ task computePoorCoverage {
 	command <<<
 		${BedToolsExe} genomecov -ibam ${BamFile} -bga \
 		| ${AwkExe} -v low_coverage="${BedtoolsLowCoverage}" '$4<low_coverage' \
-		| ${BedToolsExe} intersect -a ${IntervalBedFile} -b - \
+		| ${BedToolsExe} intersect -wb -a ${IntervalBedFile} -b - \
 		| ${SortExe} -k1,1 -k2,2n -k3,3n \
-		| ${BedToolsExe} merge -c 4,8,8 -o distinct,min,max -i - \
-		| ${BedToolsExe} intersect -loj -a -  -b ${poorCoverageDir}/*tsv  \
-		| ${BedToolsExe} intersect -a -  -b ${TsvCoverageFile} -wb  \
+		| ${BedToolsExe} merge -d 1 -c 4,8,8 -o distinct,min,max -i - \
+		| ${BedToolsExe} intersect -loj -c -a -  -b ${poorCoverageDir}/*tsv  \
+		| ${BedToolsExe} intersect -wb -loj -a -  -b ${TsvCoverageFile}  \
 		| ${AwkExe} -v small_intervall="${BedToolsSmallInterval}" \
-		'BEGIN {OFS="\t";print "#chr","start","end","region","size bp","type","Cov-min","Cov_max","Occurrence","Target_mean_coverage","gene","UCSC link"} {split($4,gene,":");a=($3-$2+1);if(a<small_intervall) {b="SMALL_INTERVAL"} else {b="OTHER"};url="http://genome-euro.ucsc.edu/cgi-bin/hgTracks?db='${GenomeVersion}'&position="$1":"$2-10"-"$3+10"&highlight='${GenomeVersion}'."$1":"$2"-"$3;print $1, $2, $3, $4, a, b, $5, $6, $7, $8, $9, url}' \
+		'BEGIN {OFS="\t";print "#chr","start","end","gene","region","region_size","type","MIN_COV","MAX_COV","Occurrence","ROI_MEAN_COV","UCSC link"} {split($4,gene,":");a=($3-$2+1);if(a<small_intervall) {b="SMALL_INTERVAL"} else {b="OTHER"};url="http://genome-euro.ucsc.edu/cgi-bin/hgTracks?db='${GenomeVersion}'&position="$1":"$2-10"-"$3+10"&highlight='${GenomeVersion}'."$1":"$2"-"$3; print $1,$2,$3,gene[1],$4,a, b,$5,$6,$7,$11, url}' \
 		> "${OutDir}${OutputDirSampleID}/${WorkflowType}/coverage/${SampleID}_poor_coverage.tsv"
 	>>>
 	output {
