@@ -256,6 +256,13 @@ if($mozaicDP eq ""){
 if(defined $trio && ($case eq "" || $dad eq "" || $mum eq "")){	
 	die("TRIO option requires 3 sample names. Please, give --case, --dad and --mum sample name arguments.\n");
 }
+
+#define trio if case dad and mum are defined
+if ($case ne "" && $dad ne "" && $mum ne ""){
+	$trio = "";
+}
+
+
 			
 #TODO affected samples
 #define affected samples List
@@ -1923,7 +1930,7 @@ while( <VCF> ){
 				}
 
 				# add depth (DP) of the Case in supplementary column
-				if ($case ne "" && $dicoSamples{$finalcol}{'columnName'} eq "Genotype-".$case){
+				if (defined $addCaseDepth && $dicoSamples{$finalcol}{'columnName'} eq "Genotype-".$case){
 					$finalSortData[$dicoColumnNbr{'Case Depth'}] = $DP;
 
 				}
@@ -3072,7 +3079,7 @@ print HTML $htmlEndTable;
 print HTML $htmlEnd;
 
 
-close(HTMl);
+close(HTML);
 
 ###############   ENd of VCF processing #####################
 #
@@ -3094,13 +3101,16 @@ if ($outDir eq "." || -d $outDir) {
 
 # Add all worksheets
 
-my $worksheetCoverage = $workbookCoverage->add_worksheetCoverage('poor cov');
-$worksheetCoverage->freeze_panes( 1, 0 );    # Freeze the first row
+my $worksheetCoverage;
 my $worksheetCoverageLine = 0;
 
 
 #poor coverage and genemap2 treatment 
 if ($poorCoverage_File ne "" &&  $genemap2_File ne ""  ){
+	
+
+	$worksheetCoverage = $workbookCoverage->add_worksheet('poor cov');
+	$worksheetCoverage->freeze_panes( 1, 0 );    # Freeze the first row
 	
 
 	open(GENEMAP2 , "<$genemap2_File") or die("Cannot open poorCoverage file ".$genemap2_File) ;
@@ -3163,6 +3173,10 @@ if ($poorCoverage_File ne "" &&  $genemap2_File ne ""  ){
 	}
 
 	close(POORCOV);
+	
+	#############add autofilters within the sheets
+	$worksheetCoverage->autofilter('A1:Z'.$worksheetCoverageLine); # Add autofilter until the end
+
 }
 
 
@@ -3174,10 +3188,6 @@ if ($poorCoverage_File ne "" &&  $genemap2_File ne ""  ){
 
 
 
-
-#############add autofilters within the sheets
-
-$worksheetCoverage->autofilter('A1:Z'.$worksheetCoverageLine); # Add autofilter until the end
 
 
 
