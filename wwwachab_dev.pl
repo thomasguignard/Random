@@ -2,7 +2,7 @@
 
 ##### wwwachab.pl ####
 
-# Author : Thomas Guignard 2021
+# Author : Thomas Guignard 2022
 
 # Description :
 # Create an User friendly Excel file from an MPA annotated VCF file.
@@ -49,10 +49,11 @@ my $man = "USAGE : \nperl wwwachab.pl
 \n--intersectVCF <VCF format File for comparison (if variant matches then 'yes' will be added in new 'intersectVCF' column) >
 \n--poorCoverageFile <poor Coverage File (it will annotate OMIM genes if present in the 4th column -requires OMIM genemap2 File- and create an excel file )>
 \n--genemap2File <OMIM genemap2 file (it will help to annotate OMIM genes in poor coverage file ) >
-\n--skipCaseWT (only if trio mode is activated, it will skip variant if case genotype is 0/0 ) >
+\n--skipCaseWT (only if trio mode is activated, it will skip variant if case genotype is 0/0 ) 
+\n--hideACMG (ACMG tab will be empty but information will be reported in the gene comment) 
 \n\n-v|--version < return version number and exit > ";
 
-my $versionOut = "achab version www:1.0.3";
+my $versionOut = "achab version www:1.0.4";
 
 #################################### VARIABLES INIT ########################
 
@@ -181,6 +182,8 @@ my @poorCoverage_List;
 my %poorCoverage_variant;
 
 
+my $hideACMG;
+
 # METADATA
 
 # inheritance checking test
@@ -227,6 +230,7 @@ GetOptions( 	"vcf=s"				=> \$incfile,
 		"poorCoverageFile:s"	=> \$poorCoverage_File,
 		"genemap2File:s"	=> \$genemap2_File,
 		"skipCaseWT"		=> \$skipCaseWT,
+		"hideACMG"		=> \$hideACMG,
     "help|h"			=> \$help,
     "version|v"   => \$version);
 
@@ -1163,7 +1167,11 @@ $commentHash{'11'}='commentGenotype';
 
 #########FILLING COLUMN TITLES FOR SHEETS
 $worksheet->write_row( 0, 0, \@columnTitles );
-$worksheetACMG->write_row( 0, 0, \@columnTitles );
+if (defined $hideACMG){
+	$worksheetACMG->write( 0, 0, "ACMG lines are hidden.");
+}else{
+	$worksheetACMG->write_row( 0, 0, \@columnTitles );
+}
 $worksheetMETA->write( 0, 0, "METADATA" );
 $worksheetOMIMDOM->write_row( 0, 0, \@columnTitles );
 $worksheetOMIMREC->write_row( 0, 0, \@columnTitles );
@@ -1171,7 +1179,7 @@ $worksheetOMIMREC->write_row( 0, 0, \@columnTitles );
 
 #write comment for pLI => NOW LOEUF is used
 $worksheet->write_comment( 0, $dicoColumnNbr{'Gene.'.$refGene}, $pLI_Comment,  x_scale => 3 );
-$worksheetACMG->write_comment( 0, $dicoColumnNbr{'Gene.'.$refGene}, $pLI_Comment,  x_scale => 3  );
+unless(defined $hideACMG){ $worksheetACMG->write_comment( 0, $dicoColumnNbr{'Gene.'.$refGene}, $pLI_Comment,  x_scale => 3  )};
 
 
 #FILLING COLUMN TITLES FOR TRIO SHEETS OR AFFECTED OR STRANGERS
@@ -1919,60 +1927,63 @@ while( <VCF> ){
 
 				#$commentGenotype .=  $dicoSamples{$finalcol}{'columnName'}."\t -\t ".$genotype[$formatIndex{'GT'}]."\nDP = ".$DP."\t AD = ".$AD."\t AB = ".$AB."\n\n";
 
+
+
+				#record mozaic status of samples and (TODO) low cov for 1/1 genotypes
+				if(($genotype[$formatIndex{'GT'}] eq "0/1" && $AB < $mozaicRate) or ($genotype[$formatIndex{'GT'}] eq "1/1" && $adalt < $mozaicDP     )){
+
+					$mozaicSamples  .= $dicoSamples{$finalcol}{'columnName'}.";";
+
+					#penalty to MPA ranking if trio and mozaic for the index case
+					if(defined $trio && $dicoSamples{$finalcol}{'columnName'} eq "Genotype-".$case){
+						$finalSortData[$dicoColumnNbr{'MPA_ranking'}] 	+= 0.1;
+
+						#penalty to low covered ALT base
+						if($adalt < $mozaicDP){
+							$finalSortData[$dicoColumnNbr{'MPA_ranking'}]   += 0.1;
+						}
+					}
+
+					if($genotype[$formatIndex{'GT'}] eq "1/1"){
+						$mozaicSamples  .= 'cyan'.";";
+						$hashColor{$dicoSamples{$finalcol}{'columnNbr'}} = 'cyan';
+
+					}elsif($adalt < $mozaicDP){
+						$mozaicSamples  .= 'purple'.";";
+						$hashColor{$dicoSamples{$finalcol}{'columnNbr'}} = 'purple';
+					}else{
+						$mozaicSamples  .= 'pink'.";";
+						$hashColor{$dicoSamples{$finalcol}{'columnNbr'}} = 'pink';
+					}
+
+
+				}else{
+					$hashColor{$dicoSamples{$finalcol}{'columnNbr'}} = 'inherit';
+				}
+			
+			
 				# POOL samples treatment, change genotype 0/0 to 0/1 if ALT depth > 1 , give yellow color to the changed sample genotype
-				if (defined $hashPooledSamples{substr($dicoSamples{$finalcol}{'columnName'},9,length($dicoSamples{$finalcol}{'columnName'})-9) }){
+				if ($genotype[$formatIndex{'GT'}] eq "0/0" && $adalt >= 1){
 
-					if ($genotype[$formatIndex{'GT'}] eq "0/0" && $adalt >= 1){
-
+					if (defined $hashPooledSamples{substr($dicoSamples{$finalcol}{'columnName'},9,length($dicoSamples{$finalcol}{'columnName'})-9) }){
 						$mozaicSamples  .= $dicoSamples{$finalcol}{'columnName'}.";";
 						$mozaicSamples  .= 'yellow'.";";
 						$hashColor{$dicoSamples{$finalcol}{'columnNbr'}} = 'yellow';
 						$genotype[$formatIndex{'GT'}] = "0/1";
-						$commentGenotype .=  $dicoSamples{$finalcol}{'columnName'}."\t -\t ".$genotype[$formatIndex{'GT'}]." (recomputed pool)\nDP = ".$DP."\t AD = ".$AD."\t AB = ".$AB."\n\n";
+						$commentGenotype .=  $dicoSamples{$finalcol}{'columnName'}."\t -\t ".$genotype[$formatIndex{'GT'}]." (recomputed 0/0)\nDP = ".$DP."\t AD = ".$AD."\t AB = ".$AB."\n\n";
 						#penalize if recomputed pool
-						$finalSortData[$dicoColumnNbr{'MPA_ranking'}] 	+= 0.1;
+						if($dicoSamples{$finalcol}{'columnName'} eq "Genotype-".$case){
+							$finalSortData[$dicoColumnNbr{'MPA_ranking'}] 	+= 0.21;
+						}
 					}else{
 						$commentGenotype .=  $dicoSamples{$finalcol}{'columnName'}."\t -\t ".$genotype[$formatIndex{'GT'}]."\nDP = ".$DP."\t AD = ".$AD."\t AB = ".$AB."\n\n";
 						$hashColor{$dicoSamples{$finalcol}{'columnNbr'}} = 'inherit';
-					}
+					}	
 				}else{
-
 					#compose comment
 					$commentGenotype .=  $dicoSamples{$finalcol}{'columnName'}."\t -\t ".$genotype[$formatIndex{'GT'}]."\nDP = ".$DP."\t AD = ".$AD."\t AB = ".$AB."\n\n";
-
-					#record mozaic status of samples and (TODO) low cov for 1/1 genotypes
-					if(($genotype[$formatIndex{'GT'}] eq "0/1" && $AB < $mozaicRate) or ($genotype[$formatIndex{'GT'}] eq "1/1" && $adalt < $mozaicDP     )){
-
-						$mozaicSamples  .= $dicoSamples{$finalcol}{'columnName'}.";";
-
-						#penalty to MPA ranking if trio and mozaic for the index case
-						if(defined $trio && $dicoSamples{$finalcol}{'columnName'} eq "Genotype-".$case){
-							$finalSortData[$dicoColumnNbr{'MPA_ranking'}] 	+= 0.1;
-
-							#penalty to low covered ALT base
-							if($adalt < $mozaicDP){
-								$finalSortData[$dicoColumnNbr{'MPA_ranking'}]   += 0.1;
-							}
-						}
-
-						if($genotype[$formatIndex{'GT'}] eq "1/1"){
-							$mozaicSamples  .= 'cyan'.";";
-							$hashColor{$dicoSamples{$finalcol}{'columnNbr'}} = 'cyan';
-
-						}elsif($adalt < $mozaicDP){
-							$mozaicSamples  .= 'purple'.";";
-							$hashColor{$dicoSamples{$finalcol}{'columnNbr'}} = 'purple';
-						}else{
-							$mozaicSamples  .= 'pink'.";";
-							$hashColor{$dicoSamples{$finalcol}{'columnNbr'}} = 'pink';
-						}
-
-
-					}else{
-						$hashColor{$dicoSamples{$finalcol}{'columnNbr'}} = 'inherit';
-					}
 				}
-
+				
 				# add depth (DP) of the Case in supplementary column
 				if (defined $addCaseDepth && $dicoSamples{$finalcol}{'columnName'} eq "Genotype-".$case){
 					$finalSortData[$dicoColumnNbr{'Case Depth'}] = $DP;
@@ -2211,8 +2222,14 @@ while( <VCF> ){
 			#ACMG
 			#if(defined $ACMGgene{$finalSortData[$dicoColumnNbr{'Gene.'.$refGene}]} )
 			if(defined $ACMGgene{$geneName} ){
-				$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'worksheet'} .= " ACMG";
-				$tagsHash{'ACMG'}{'count'} ++;
+
+				if (defined $hideACMG){
+					$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'commentpLI'} = "ACMG warning\n\n";	
+                    $hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'colorpLI'} =  '#FFFFFF' ;
+				}else{
+					$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'worksheet'} .= " ACMG";
+					$tagsHash{'ACMG'}{'count'} ++;
+				}
 			}
 
 			#CANDIDATES
@@ -2257,7 +2274,7 @@ while( <VCF> ){
 
 #            oe_lof_upper_rank   oe_lof_upper_bin    oe_lof  oe_lof_lower    oe_lof_upper    oe_mis  oe_mis_lower    oe_mis_upper
 
-			$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'commentpLI'} =  "LOEUF = ".$dicoInfo{'oe_lof_upper.'.$refGene}."\nLOEUF_decile = ".$dicoInfo{'oe_lof_upper_bin.'.$refGene}."\n\noe_lof = ".$dicoInfo{'oe_lof.'.$refGene}."\noe_lof_lower = ".$dicoInfo{'oe_lof_lower.'.$refGene} ."\n\n";
+			$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'commentpLI'} .=  "LOEUF = ".$dicoInfo{'oe_lof_upper.'.$refGene}."\nLOEUF_decile = ".$dicoInfo{'oe_lof_upper_bin.'.$refGene}."\n\noe_lof = ".$dicoInfo{'oe_lof.'.$refGene}."\noe_lof_lower = ".$dicoInfo{'oe_lof_lower.'.$refGene} ."\n\n";
 
             if( $dicoInfo{'oe_lof_upper_bin.'.$refGene} =~ /;/){
 
@@ -2298,7 +2315,7 @@ while( <VCF> ){
 
 		}else{
 
-			$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'commentpLI'} =  "." ;
+			$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'commentpLI'} .=  "." ;
 			$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'colorpLI'} =  '#FFFFFF' ;
 
 			#$format_pLI = $workbook->add_format(bg_color => '#FFFFFF');
@@ -3120,7 +3137,9 @@ if($candidates ne ""){
  }
 
 
-
+if (defined $hideACMG){
+	$worksheetACMG->hide();
+}
 
 $workbook->close();
 close(VCF);
