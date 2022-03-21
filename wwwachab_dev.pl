@@ -53,7 +53,7 @@ my $man = "USAGE : \nperl wwwachab.pl
 \n--hideACMG (ACMG tab will be empty but information will be reported in the gene comment) 
 \n\n-v|--version < return version number and exit > ";
 
-my $versionOut = "achab version www:1.0.4";
+my $versionOut = "achab version www:1.0.5";
 
 #################################### VARIABLES INIT ########################
 
@@ -727,7 +727,41 @@ if($intersectVCF_File ne ""){
 
 		}else{
 
-			$intersectVCF_variant{$intersectVCF_List[0]."_".$intersectVCF_List[1]."_".$intersectVCF_List[3]."_".$intersectVCF_List[4]} = "yes";
+			#$intersectVCF_variant{$intersectVCF_List[0]."_".$intersectVCF_List[1]."_".$intersectVCF_List[3]."_".$intersectVCF_List[4]} = "yes";
+			$intersectVCF_variant{$intersectVCF_List[0]."_".$intersectVCF_List[1]."_".$intersectVCF_List[3]."_".$intersectVCF_List[4]}{"exists"} = "yes";
+			$intersectVCF_variant{$intersectVCF_List[0]."_".$intersectVCF_List[1]."_".$intersectVCF_List[3]."_".$intersectVCF_List[4]}{"seen"} = 0;
+			$intersectVCF_variant{$intersectVCF_List[0]."_".$intersectVCF_List[1]."_".$intersectVCF_List[3]."_".$intersectVCF_List[4]}{"Phenotypes"} = "";
+			$intersectVCF_variant{$intersectVCF_List[0]."_".$intersectVCF_List[1]."_".$intersectVCF_List[3]."_".$intersectVCF_List[4]}{"CLNSIG"} = "";
+			$intersectVCF_variant{$intersectVCF_List[0]."_".$intersectVCF_List[1]."_".$intersectVCF_List[3]."_".$intersectVCF_List[4]}{"MPA_impact"} = "";
+			
+			
+			########### Split INFOS #####################
+
+			my %intersectInfo;
+			my @infoList = split(';', $line[7] );
+			foreach my $info (@infoList){
+				my @infoKeyValue = split('=', $info );
+				if (scalar @infoKeyValue == 2){
+					
+					$infoKeyValue[1] =~ s/\\x3d/=/g;
+					$infoKeyValue[1] =~ s/\\x3b/;/g;
+					
+					if ($infoKeyValue[0] eq "CLNSIG") {
+						
+						$intersectVCF_variant{$intersectVCF_List[0]."_".$intersectVCF_List[1]."_".$intersectVCF_List[3]."_".$intersectVCF_List[4]}{"CLNSIG"} = $infoKeyValue[1];
+					
+					}elsif( $infoKeyValue[0] eq "MPA_impact"){
+						
+						$intersectVCF_variant{$intersectVCF_List[0]."_".$intersectVCF_List[1]."_".$intersectVCF_List[3]."_".$intersectVCF_List[4]}{"MPA_impact"} = $infoKeyValue[1];
+					
+					}elsif( $infoKeyValue[0] =~ /^Phenotypes/){
+						
+						$intersectVCF_variant{$intersectVCF_List[0]."_".$intersectVCF_List[1]."_".$intersectVCF_List[3]."_".$intersectVCF_List[4]}{"Phenotypes"} = $infoKeyValue[1];
+
+					}
+
+				}
+			}
 		}
 	}
 	close(INTERSECTVCF);
@@ -1786,8 +1820,19 @@ while( <VCF> ){
 		#CHECK IF variant is in intersectVCF
 		if($intersectVCF_File ne ""){
 
-			if( defined $intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}){
+			if( defined $intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}{"exists"}){
 				$finalSortData[$dicoColumnNbr{'intersectVCFannotation'}] = "yes";
+				$intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}{"seen"} ++ ;
+				
+				if ($dicoInfo{"CLNSIG"} ne  $intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}{"CLNSIG"} ){
+					$finalSortData[$dicoColumnNbr{'intersectVCFannotation'}] .= ";CLNSIG:".$intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}{"CNSIG"}; 
+				}	
+				if ($dicoInfo{"Phenotypes.".$refGene} ne  $intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}{"Phenotypes"} ){
+					$finalSortData[$dicoColumnNbr{'intersectVCFannotation'}] .= ";Phenotypes:".$intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}{"Phenotypes"}; 
+				}	
+				if ($dicoInfo{"MPA_impact"} ne  $intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}{"MPA_impact"} ){
+					$finalSortData[$dicoColumnNbr{'intersectVCFannotation'}] .= ";MPA_impact:".$intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}{"MPA_impact"}; 
+				}	
 
 			}else{
 				$finalSortData[$dicoColumnNbr{'intersectVCFannotation'}] = "no";
