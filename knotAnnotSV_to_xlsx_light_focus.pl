@@ -263,7 +263,7 @@ my %colNameMode = (
 "SV_chrom"=>"fullsplit",
 "SV_start"=>"fullsplit",
 "SV_end"=>"fullsplit",
-"SV_length"=>"fullsplit",
+"SV_length"=>"full",
 "SV_type"=>"fullsplit",
 "Samples_ID"=>"fullsplit",
 "REF"=>"fullsplit",
@@ -554,6 +554,7 @@ while( <VCF> ){
 			}
 			
 			$dataHash{"OMIM_ID_XLSX"} = $OMIM_ID_link_string ;
+			$dataHash{"OMIM_ID"} = $OMIM_ID_link_string ;
 
 
 			if ($dataHash{"OMIM_phenotype"} ne "."){
@@ -564,7 +565,7 @@ while( <VCF> ){
 					for ( my $ID = 0 ; $ID < scalar @OMIM_phen_array ; $ID++){
 						if( $OMIM_phen_array[$ID] =~ m/^(.+?)(\d{6})(.+?)$/){
 								# DEBUG LIGHT 
-							$tempString .=   $1.$2.$3;   	
+							$tempString .=   $1.$2.$3.";\n";   	
 						
 							#DEBUG TODO not sure
 							if ( $ID == 0 ){
@@ -606,11 +607,12 @@ while( <VCF> ){
 				#$tempString = "";
 				@GeneName_array = split(/; /, $dataHash{"Gene_name"} );
 				for( my $ID = 0 ; $ID < scalar @GeneName_array; $ID++){
+					#count gene name for further RE-gene identification
 					$GeneName_hash{$GeneName_array[$ID]} = 1;
 					#DEBUG LIGHT 
 					#$tempString .=    $GeneName_array[$ID];
 					if (scalar @GeneName_array == 1){
-						$GeneName_link_url = "<a href=\"https://www.genecards.org/cgi-bin/carddisp.pl?gene=".$GeneName_array[$ID]."\" target=\"_blank\" rel=\"noopener noreferrer\" >".$GeneName_array[$ID]."</a>";
+						$GeneName_link_url = "https://www.genecards.org/cgi-bin/carddisp.pl?gene=".$GeneName_array[$ID];
 					}
 					if($ID < 2){
 						# DEBUG LIGHT
@@ -632,7 +634,9 @@ while( <VCF> ){
 			
 			$dataHash{"Gene_name_XLSX"} = $GeneName_link_string ;
 			$dataHash{"Gene_name_url"} = $GeneName_link_url ;
-			
+			$dataHash{"Gene_name"} = $GeneName_link_string ;
+
+
 
 			#Classify RE_Gene elements according to Gene name list to highlight missing elements
 			if ($dataHash{"RE_gene"} ne "."){
@@ -668,7 +672,7 @@ while( <VCF> ){
 				}
 				$dataHash{"RE_gene"} = $tempString;
 				
-				$tempString =~ s/<br>/\n/g ;
+				#$tempString =~ s/<br>/\n/g ;
 				$dataHash{"RE_gene_XLSX"} = $tempString  ;
 
 			}
@@ -941,13 +945,17 @@ while( <VCF> ){
 				$fullSplitScore = 10;
 				$gene2Keep=""; 
 				if (defined $dataHash{"Exomiser_gene_pheno_score"} && $dataHash{"Exomiser_gene_pheno_score"} ne "-1" && $dataHash{"Exomiser_gene_pheno_score"} ne "NA"){
-					$fullSplitScore += (20 * $dataHash{"Exomiser_gene_pheno_score"});	
+					$fullSplitScore += (40 * $dataHash{"Exomiser_gene_pheno_score"});	
 					if($dataHash{"Exomiser_gene_pheno_score"} >= 0.7){
 						$gene2Keep="yes";
 					}
 				}	
 				if(defined $dataHash{"OMIM_morbid"} && $dataHash{"OMIM_morbid"} eq "yes"){
-					$fullSplitScore += 10;
+					$fullSplitScore += 30;
+					$gene2Keep="yes";
+				}
+				if(defined $dataHash{"OMIM_morbid_candidate"} && $dataHash{"OMIM_morbid_candidate"} eq "yes"){
+					$fullSplitScore += 20;
 					$gene2Keep="yes";
 				}
 				if(defined $dataHash{"LOEUF_bin"} && $dataHash{"LOEUF_bin"} ne "."){
@@ -1032,12 +1040,17 @@ my $workbook;
 
 $workbook = Excel::Writer::XLSX->new($outDir."/".$outPrefix.$outBasename.".xlsx");
 
+#optimize memory usage (row of data is discarded once it has been written in worksheet
+$workbook->set_optimization();
+
 my $worksheet = $workbook->add_worksheet($outPrefix.$outBasename);
 $worksheet->freeze_panes( 1, 2);    # Freeze the first row and first column
 my $worksheetLine = 0;
+#Set column width
 $worksheet->set_column( 'A:A', 8 );
 $worksheet->set_column( 'B:B', 30 );
-$worksheet->set_column( 'C:Z', 15 );
+$worksheet->set_column( 'C:E', 8 );
+$worksheet->set_column( 'F:Z', 11 );
 
 
 
@@ -1076,32 +1089,23 @@ my $format_pLI_basic_split = $workbook->add_format(bg_color => 'undef');
 
 my $geneCounter=0;
 
-# check if last line was "FULL" to finish the raw with </tr>
-
 
 foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSortData){
 	print $rank."\n";
 	
 	foreach my $ID ( keys %{$hashFinalSortData{$rank}}){
 		
-		#foreach my $rankSplit (sort {$hashFinalSortData{$rank}{$ID}{$b} <=> $hashFinalSortData{$rank}{$ID}{$a} } ( keys %{$hashFinalSortData{$rank}{$ID}})){
 		foreach my $rankSplit (rnatkeysort { "$_-$hashFinalSortData{$rank}{$ID}{$_}" }  keys %{$hashFinalSortData{$rank}{$ID}}){
 	
-#			print "DEBUG ranksplit:  ".$rankSplit."\n";
-
 			foreach my $variant ( keys %{$hashFinalSortData{$rank}{$ID}{$rankSplit}}){
 			
 			#increse rank number then change final array
 			$kindRank++;
-		
 				
 			$XLSXcol =0;
 
-
-#			print "here 0\n";
 			#FILL tab 'ALL';
 			if (    $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Annotation_mode'} - 1] eq "full") {
-				####$htmlALL .= "<tr id=\"".$ID."\" class=\"full\" style=\"background-color:".$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'fullRowColor'}."\" >\n";
 
 				$format_pLI = $workbook->add_format(bg_color => $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'fullRowColor'} );
 				$format_pLI_url = $workbook->add_format(bg_color => $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'fullRowColor'},color => 'blue', underline => 1 );
@@ -1116,7 +1120,7 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 
 			}else{
 			
-				if($geneCountThreshold ne ""){
+				if(defined $geneCountThreshold and $geneCountThreshold ne ""){
 					if ($geneCounter <= $geneCountThreshold ){
 						if($hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'gene2Keep'} ne "yes"){
 							$geneCounter ++;	
@@ -1126,15 +1130,9 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 					}
 				}
 
-				####$htmlALL .= "<tr class=\"fullsplit ".$ID."\" >\n";
-				
 				#Line grouping 
-				$worksheet->set_row( $worksheetLine , undef, undef, 1, 1 );
+				$worksheet->set_row( $worksheetLine , undef, undef, 1, 1 ,1);
 				
-				#$format_pLI = $workbook->add_format(bg_color => 'undef');
-				#$format_pLI_url = $workbook->add_format(bg_color => 'undef' ,color => 'blue', underline => 1 );
-				#$format_pLI_basic = $workbook->add_format(bg_color => 'undef');
-			
 				#add first column with original rank of knot
 				$worksheet->write( $worksheetLine, 0, $kindRank, $format_pLI_split  );
 				$worksheet->write_row( $worksheetLine, 1,$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}, $format_pLI_split  );
@@ -1142,70 +1140,59 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 			}
 
 
-			#Once for "ALL"  = FULL+SPLIT
-#			print "here 1\n";
 			# FOR EACH FIELD OF FINAL ARRAY
 			for( my $fieldNbr = 0 ; $fieldNbr < scalar @{$hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}} ; $fieldNbr++){
 	
-
 				#ADD COMMENTS IF EXIST
 				if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashCommentsXLSX'}{$fieldNbr}){
 
-					
 						if (defined $NameColHash{'OMIM_phenotype'} && $fieldNbr eq $NameColHash{'OMIM_phenotype'} - 1 ){
 							$worksheet->write_comment( $worksheetLine, $fieldNbr + 1 ,   $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_phen_short_XLSX'},x_scale => 2, y_scale => 5)  ;   
-#						print "here 1ter\n";
 
 						}else{
 							$worksheet->write_comment( $worksheetLine, $fieldNbr + 1 ,   $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashCommentsXLSX'}{$fieldNbr},x_scale => 2, y_scale => 5)  ;   
 
 						}
-
-
-						if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr}){
-							$format_pLI = $workbook->add_format(bg_color => $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr} );
-							$worksheet->write( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]  , $format_pLI)  ;  
-
-							
-						}
-
 				}
 				
 				$XLSXcol ++;
 				
 					
-				#if (defined $field)
-				if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]){
+				if ($hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Annotation_mode'} - 1] eq "full" ){
 
-					if (defined $NameColHash{'RE_gene'} && $fieldNbr eq $NameColHash{'RE_gene'} - 1 ){
-
-						$worksheet->write( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'RE_gene_XLSX'} )  ;   
-					}
 
 					#Add url to UCSC browser or HGNC with gene name for full only
-					if ($hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$NameColHash{'Annotation_mode'} - 1] eq "full" ){
+
 						if ($fieldNbr eq $NameColHash{'AnnotSV_ID'} - 1 ){
+							
+							if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]){
 
-							$worksheet->write_url( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'url2UCSC'} , $format_pLI_url, $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr])  ;   
+								$worksheet->write_url( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'url2UCSC'} , $format_pLI_url, $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr])  ;   
+							}
+							#if (defined $NameColHash{'RE_gene'} && $fieldNbr eq $NameColHash{'RE_gene'} - 1 ){
+	
+							#	$worksheet->write( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'RE_gene_XLSX'},  $format_pLI )  ;   
+							#}
 						}
-					}
-
+					
+				}else{
 					
 					if (defined $NameColHash{'Gene_name'} && $fieldNbr eq $NameColHash{'Gene_name'} - 1 ){
 					
-		
-						if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr}){
-							$format_pLI_basic = $workbook->add_format(bg_color => $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr}, color =>      'blue', underline => 1 );
+						if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]){
+							if( $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_url'} ne "."){	
+								if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr}){
+									$format_pLI_basic = $workbook->add_format(bg_color => $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'hashColor'}{$fieldNbr}, color =>      'blue', underline => 1 );
+								}
+								$worksheet->write_url( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_url'} , $format_pLI_basic, $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short_XLSX'})  ;   
+							}else{
+								$worksheet->write( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short_XLSX'} , $format_pLI_basic)  ;   
+							}				
+						#}elsif (defined $NameColHash{'OMIM_ID'} && $fieldNbr eq $NameColHash{'OMIM_ID'} - 1 ){
+						#	$worksheet->write( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_ID_short_XLSX'}  )  ;   
 						}
-
-						if( $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_url'} ne "."){	
-							$worksheet->write_url( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_url'} , $format_pLI_basic, $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short_XLSX'})  ;   
-						}else{
-							$worksheet->write( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'GeneName_short_XLSX'} , $format_pLI_basic)  ;   
-						}				
-					}elsif (defined $NameColHash{'OMIM_ID'} && $fieldNbr eq $NameColHash{'OMIM_ID'} - 1 ){
-						$worksheet->write( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_ID_short_XLSX'}  )  ;   
 					}
+				
 				} # 
 
 			} #END FOR FULL+SPLIT tab
@@ -1232,6 +1219,10 @@ print STDERR "\n\n\nDone!\n\n\n";
 
 
 
-exit 0; 
+exit 0;
+
+
+
+
 
 
