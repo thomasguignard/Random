@@ -1046,12 +1046,17 @@ $workbook = Excel::Writer::XLSX->new($outDir."/".$outPrefix.$outBasename.".xlsm"
 #add vba macro 
 #open( VBAmacro , "<$vbaBin" )or print("Cannot find VBA bin file ".$vbaBin."\n") ;
 $workbook->add_vba_project( $vbaBin );
+$workbook->set_vba_name( 'ThisWorkbook' );
 
 
 #optimize memory usage (row of data is discarded once it has been written in worksheet
 $workbook->set_optimization();
 
-my $worksheet = $workbook->add_worksheet($outPrefix.$outBasename);
+my $worksheet = $workbook->add_worksheet('knot');
+#my $worksheet = $workbook->add_worksheet($outPrefix.$outBasename);
+#$worksheet->set_vba_name($outPrefix.$outBasename); 
+$worksheet->set_vba_name('knot'); 
+
 $worksheet->freeze_panes( 1, 2);    # Freeze the first row and first column
 my $worksheetLine = 0;
 #Set column width
