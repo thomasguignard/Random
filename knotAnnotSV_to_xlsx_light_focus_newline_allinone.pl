@@ -1044,7 +1044,9 @@ my $workbook;
 $workbook = Excel::Writer::XLSX->new($outDir."/".$outPrefix.$outBasename.".xlsm");
 
 #add vba macro 
-open( VBAmacro , "<$vbaBin" )or print("Cannot find VBA bin file ".$vbaBin."\n") ;
+#open( VBAmacro , "<$vbaBin" )or print("Cannot find VBA bin file ".$vbaBin."\n") ;
+$workbook->add_vba_project( $vbaBin );
+
 
 #optimize memory usage (row of data is discarded once it has been written in worksheet
 $workbook->set_optimization();
