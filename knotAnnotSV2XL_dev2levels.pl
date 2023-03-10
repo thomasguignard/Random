@@ -1011,6 +1011,10 @@ while( <VCF> ){
 			#add gene count to full line 
 			#$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'geneCount'} = $geneCount ; 
 
+			#flag gene Location for display 
+			if(defined $dataHash{"Location"}){
+				$hashFinalSortData{$SV_ID{$dataHash{'AnnotSV_ID'}}{'finalScore'}."_".$variantID}{$dataHash{'AnnotSV_ID'}}{$fullSplitScore}{$count}{'Location'} = $dataHash{"Location"} ; 
+			}
 
 			
 			#url to UCSC for SV , highlight in blue and zoomout x1.5
@@ -1158,6 +1162,8 @@ my $format_comment_line_full = $workbook->add_format(bg_color => 'undef', color 
 my $format_comment_line = $workbook->add_format(bg_color => 'undef', color => 'gray', text_wrap => 1 , align =>'top');
 my $format_comment_line_switch;
 
+my $format_truncated_Location = $workbook->add_format(border => 8, bg_color => 'undef', text_wrap => 1 , align =>'top'); # set border for truncated Gene 
+
 my $geneCounter=0;
 
 
@@ -1266,6 +1272,14 @@ foreach my $rank (rnatkeysort { "$_-$hashFinalSortData{$_}" } keys %hashFinalSor
 							}				
 						#}elsif (defined $NameColHash{'OMIM_ID'} && $fieldNbr eq $NameColHash{'OMIM_ID'} - 1 ){
 						#	$worksheet->write( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'OMIM_ID_short_XLSX'}  )  ;   
+						}
+					}elsif (defined $NameColHash{'Location'} && $fieldNbr eq $NameColHash{'Location'} - 1 ){
+					
+						if (defined $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr]){
+							if ($hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'Location'} ne "txStart-txEnd" && $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'Location'} ne "."){
+								
+								$worksheet->write( $worksheetLine, $fieldNbr + 1 , $hashFinalSortData{$rank}{$ID}{$rankSplit}{$variant}{'finalArray'}[$fieldNbr] , $format_truncated_Location); ;   
+							}				
 						}
 					}
 				
