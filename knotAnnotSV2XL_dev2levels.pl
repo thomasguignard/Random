@@ -6,9 +6,9 @@
 # knotAnnotSV2XL: Creation of a customizable xlsm file to visualize, filter                  # 
 #                   and analyze an AnnotSV output                                            #
 #                                                                                            #
-# Author: Thomas Guignard 2020-2022                                                          #
+# Author: Thomas Guignard 2020-2023                                                          #
 #                                                                                            #
-# Copyright (C) 2020-2022 Thomas Guignard (t-guignard@chu-montpellier.fr)                    #
+# Copyright (C) 2020-2023 Thomas Guignard (t-guignard@chu-montpellier.fr)                    #
 #                                                                                            #
 # This is part of knotAnnotSV source code.                                                   #
 #                                                                                            #
@@ -512,7 +512,7 @@ while( <VCF> ){
         
 		#reinitialize Comment Values
 		foreach my $field (keys %dataCommentHash){
-			delete $dataCommentHash{$field}{'values'};
+			#delete $dataCommentHash{$field}{'values'};
 			delete $dataCommentHash{$field}{'valuesXLSX'};
 		}
 		
@@ -652,12 +652,16 @@ while( <VCF> ){
 				#$dataHash{"Gene_name"} = $tempString  ;
 				if (scalar @GeneName_array > 1){
 					$GeneName_link_string .= " [...".$dataHash{"Gene_count"}."genes]";
+					$dataHash{"Gene_name_full"} = "Gene list : ".$dataHash{"Gene_name"} ;
+
 				}else{
 					$GeneName_link_string =~ s/;$//;
+					$dataHash{"Gene_name_full"} = "" ;
 				}
 			}else{
 				$GeneName_link_string = ".";
 				$GeneName_link_url = ".";
+				$dataHash{"Gene_name_full"} = "" ;
 			}
 			
 			$dataHash{"Gene_name_XLSX"} = $GeneName_link_string ;
@@ -746,7 +750,8 @@ while( <VCF> ){
 			#if (defined $dataCommentHash{$field})
 			#	foreach my $fieldCom (@{$dataCommentHash{$field}{'commentFieldList'}})
 			if (defined $dataCommentHash{$field}){
-                if (! defined $dataCommentHash{$field}{'values'}){
+                if (! defined $dataCommentHash{$field}{'valuesXLSX'}){
+					$dataCommentHash{$field}{'valuesXLSX'} = ""; 
 					#special treatment for field , adding to comment the switched name
 					if ( $field =~ /^[po_]*[BP]_/){
 						if ($SV_type eq "DEL" ){ 
@@ -758,7 +763,7 @@ while( <VCF> ){
 						}
 						$commentDuplicate{$correctFieldCom} += 1;	
 						#add in first line of comment
-               		 	$dataCommentHash{$field}{'values'} .= "<span class=\"commentTitle\">".$correctFieldCom . " :</span> ".$dataHash{$correctFieldCom};
+               		 	#$dataCommentHash{$field}{'values'} .= "<span class=\"commentTitle\">".$correctFieldCom . " :</span> ".$dataHash{$correctFieldCom};
                		 	$dataCommentHash{$field}{'valuesXLSX'} .= $correctFieldCom . " : ".$dataHash{$correctFieldCom};
 					}
 
@@ -872,6 +877,9 @@ while( <VCF> ){
 			}
 			if (defined $dataCommentHash{$field} && $dataCommentHash{$field} != 0){
 				$finalSortData[$NameColHash{$field} - 1] .= "\n".$dataCommentHash{$field}{'valuesXLSX'};
+				if ($field eq "Gene_name"){
+					$finalSortData[$NameColHash{$field} - 1] .= "\n\n".$dataHash{'Gene_name_full'};
+				}
 			}
 		}
 
