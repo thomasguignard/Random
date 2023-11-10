@@ -2,7 +2,7 @@
 
 ##### wwwachab.pl ####
 
-# Author : Thomas Guignard 2022
+# Author : Thomas Guignard 2023
 
 # Description :
 # Create an User friendly Excel file from an MPA annotated VCF file.
@@ -13,6 +13,7 @@ use warnings;
 use Getopt::Long;
 use Excel::Writer::XLSX;
 use Switch;
+use File::Basename;
 #use Pod::Usage;
 #use List::Util qw(first);
 #use Data::Dumper;
@@ -24,7 +25,7 @@ my $man = "USAGE : \nperl wwwachab.pl
 \n--outPrefix <output file prelifx (default = \"\")>
 \n--candidates <file with end-of-line separated gene symbols of interest (it will create more tabs, if '#myPathology' is present in the file, a 'myPathology' tab will be created) >
 \n--phenolyzerFile <phenolyzer output file suffixed by predicted_gene_scores (it will contribute to the final ranking and top50 genes will be added in METADATA tab) >
-\n--popFreqThr <allelic frequency threshold from 0 to 1 default=0.01 (based on gnomAD_genome_ALL) >
+\n--popFreqThr <allelic frequency threshold from 0 to 1 default=0.01 (based on gnomAD_genome_ALL or on the first field of --gnomadGenome argument) >
 \n--trio (requires case dad and mum option to be filled, but if case dad and mum option are filled, trio mode is automatically activated)
 \n\t--case <index_sample_name> (required with trio option)
 \n\t--dad <father_sample_name> (required with trio option)
@@ -49,11 +50,14 @@ my $man = "USAGE : \nperl wwwachab.pl
 \n--intersectVCF <VCF format File for comparison (if variant matches then 'yes' will be added in new 'intersectVCF' column) >
 \n--poorCoverageFile <poor Coverage File (it will annotate OMIM genes if present in the 4th column -requires OMIM genemap2 File- and create an excel file )>
 \n--genemap2File <OMIM genemap2 file (it will help to annotate OMIM genes in poor coverage file ) >
-\n--skipCaseWT (only if trio mode is activated, it will skip variant if case genotype is 0/0 ) 
+\n--skipCaseWT (only if trio mode is activated or in 'duo' if case+dad are defined or if case+mum are defined , it will skip variant if case genotype is 0/0 ) 
 \n--hideACMG (ACMG tab will be empty but information will be reported in the gene comment) 
+\n--gnomadGenome <comma separated list of gnomad genome annotation fields that will be displayed as gnomAD_Genome comments. First field of the list will be filtered regarding to popFreqThr argument. (default fields are hard-coded gnomAD_genome_ALL like)  > 
+\n--gnomadExome <comma separated list of gnomad exome annotation fields that will be displayed as gnomAD comments. (default fields are hard-coded gnomAD_exome_ALL like) > 
+\n--MDAPIkey <Path to File containing only MobiDetails API key (default file is MD.apikey in the achab folder) >
 \n\n-v|--version < return version number and exit > ";
 
-my $versionOut = "achab version www:1.0.5";
+my $versionOut = "achab version www:1.0.13";
 
 #################################### VARIABLES INIT ########################
 
@@ -169,6 +173,7 @@ my @sampleSubsetArray;
 my $addCaseDepth;
 my $addCaseAB;
 my $skipCaseWT;
+my $duo;
 
 #Poor coverage File and omim genemap2 file
 my $genemap2_File = "";
@@ -181,6 +186,13 @@ my $poorCoverage_Line;
 my @poorCoverage_List;
 my %poorCoverage_variant;
 
+#adapt gnomAD names
+my $gnomadGenome_names = "";
+my @gnomadGenome_List;
+my $gnomadGenomeColumn = "gnomAD_genome_ALL";
+my $gnomadExome_names = "";
+my @gnomadExome_List;
+my $gnomadExomeColumn = "gnomAD_exome_ALL";
 
 my $hideACMG;
 
@@ -196,6 +208,12 @@ my $vcfHeader = "";
 
 my @buttonArray ;
 my %tagsHash;
+
+#URL corner
+my $mdAPIkey = "";
+my $md_line = "";
+my $franklinURL = "https://franklin.genoox.com/clinical-db/variant/snp/";
+my $build = "hg19";
 
 #$arguments = GetOptions( "vcf=s" => \$incfile ) or pod2usage(-vcf => "$0: argument required\n") ;
 
@@ -231,8 +249,11 @@ GetOptions( 	"vcf=s"				=> \$incfile,
 		"genemap2File:s"	=> \$genemap2_File,
 		"skipCaseWT"		=> \$skipCaseWT,
 		"hideACMG"		=> \$hideACMG,
-    "help|h"			=> \$help,
-    "version|v"   => \$version);
+		"gnomadGenome:s"	=> \$gnomadGenome_names,
+		"gnomadExome:s"	=> \$gnomadExome_names,
+		"MDAPIkey:s"	=> \$mdAPIkey,
+		"help|h"			=> \$help,
+		"version|v"   => \$version);
 
 
 
@@ -289,12 +310,30 @@ if ($case ne "" && $dad ne "" && $mum ne ""){
 	$trio = "";
 }
 
-
+#define duo (at least) if case and dad and not mum or case and mum and not dad are defined => concern skipCaseWT option only
+if ($case ne "" ){
+	if (($dad ne "" && $mum eq "") || ($dad eq "" && $mum ne "")){
+ 		$duo = "";
+	}
+}
 
 #TODO affected samples
 #define affected samples List
 if($affected ne ""){
 	chomp $affected;
+	$affected =~ s/"//g; 
+	if(defined $trio and $case ne ""){
+		$affected =~ s/$case,//g; 
+		$affected =~ s/,$dad//g; 
+		$affected =~ s/$dad,//g; 
+		$affected =~ s/,$mum//g; 
+		$affected =~ s/$mum,//g; 
+	}
+
+	$affected =~ s/,,/,/g; 
+	$affected =~ s/^,//g; 
+	$affected =~ s/,$//g; 
+
 	@affectedArray = split(/,/ , $affected);
 	foreach my $affSample (@affectedArray){
 		if (defined $hashAffected{$affSample}){
@@ -309,6 +348,9 @@ if($affected ne ""){
 #pooled samples , check in header
 if ($pooledSamples ne ""){
 	chomp $pooledSamples;
+	$pooledSamples =~ s/"//g ;
+	$pooledSamples =~ s/^,//g; 
+	$pooledSamples =~ s/,$//g; 
 	@pooledSamplesArray = split(/,/ , $pooledSamples);
 	foreach my $pooled (@pooledSamplesArray){
 		if (defined $hashPooledSamples{$pooled}){
@@ -332,6 +374,18 @@ if ($IDSNP ne ""){
 			$hashIDSNP{$rs} = "ID";
 		}
 	}
+}
+
+#gnomad names
+if ($gnomadGenome_names ne ""){
+	chomp $gnomadGenome_names;
+	@gnomadGenome_List = split(/,/ , $gnomadGenome_names);
+	$gnomadGenomeColumn = $gnomadGenome_List[0]; 
+}
+if ($gnomadExome_names ne ""){
+	chomp $gnomadExome_names;
+	@gnomadExome_List = split(/,/ , $gnomadExome_names);
+	$gnomadExomeColumn = $gnomadExome_List[0]; 
 }
 
 
@@ -358,8 +412,7 @@ my %dicoParam;
 
 my $refGene = 'refGene';
 while( <VCF> ){
-  	$current_line = $_;
-
+	$current_line = $_;
 
 	chomp $current_line;
 
@@ -368,8 +421,15 @@ while( <VCF> ){
     if ($current_line=~/^##/){
 
         $vcfHeader .= $_;
+	
+	#deduce genome build from header , like bcftools command line including with genome fasta 
+	if ($current_line=~/38\.fa/){
+		$build = "hg38";
+	}
 
-		  unless ($current_line=~/Description=/){ next }
+		
+
+	  unless ($current_line=~/Description=/){ next }
       #DEBUG print STDERR "Header line\n";
 
       if ($current_line =~ /ID=(.+?),.*?Description="(.+?)"/){
@@ -418,10 +478,13 @@ while( <VCF> ){
 				print STDERR "Found Sample ".$line[$sampleIndex]."\n";
 				push @sampleList, $line[$sampleIndex];
 			}
+			
+			
 
 			#populate non affected-samples array
-			if (defined $hashAffected{$line[$sampleIndex]} or (defined $trio and ($line[$sampleIndex] ne $case or $line[$sampleIndex] ne $dad or $line[$sampleIndex] ne $mum))  ){
+			if (defined $hashAffected{$line[$sampleIndex]} or (defined $trio and ($line[$sampleIndex] eq $case or $line[$sampleIndex] eq $dad or $line[$sampleIndex] eq $mum))  ){
 				#do nothing
+
 			}else{
 				push @nonAffectedArray, $line[$sampleIndex];
 			}
@@ -738,8 +801,9 @@ if($intersectVCF_File ne ""){
 			########### Split INFOS #####################
 
 			my %intersectInfo;
-			my @infoList = split(';', $line[7] );
+			my @infoList = split(';', $intersectVCF_List[7] );
 			foreach my $info (@infoList){
+				
 				my @infoKeyValue = split('=', $info );
 				if (scalar @infoKeyValue == 2){
 					
@@ -763,7 +827,7 @@ if($intersectVCF_File ne ""){
 				}
 			}
 		}
-	}
+	}# end while
 	close(INTERSECTVCF);
 }
 
@@ -865,16 +929,68 @@ if($favouriteGeneRef ne ""){
 }
 
 
+#parse genemap2 file
+if ( $genemap2_File ne ""  ){
+	open(GENEMAP2 , "<$genemap2_File") or die("Cannot open genemap2 file ".$genemap2_File) ;
+	print  STDERR "Processing genemap2 file ... \n" ;
+
+	while( <GENEMAP2> ){
+
+  		$genemap2_Line = $_;
+
+		#skip header
+		next if ($genemap2_Line=~/^#/);
+
+		chomp $genemap2_Line;
+		@genemap2_List = split( /\t/, $genemap2_Line );
+
+		if (defined $genemap2_List[8]  && $genemap2_List[8] ne ""){
+			if (defined $genemap2_variant{$genemap2_List[8]}){
+				if (! defined $genemap2_List[12]){
+					$genemap2_List[12] = "";
+				}
+
+				$genemap2_variant{$genemap2_List[8]} .= ";".$genemap2_List[12];
+
+			}else{
+				$genemap2_variant{$genemap2_List[8]} = $genemap2_List[12];
+			}
+		}
+	}
+	close(GENEMAP2);
+}
+
+
+#get mobidetails API key from achab script location or argument
+if ($mdAPIkey eq ""){
+	$mdAPIkey = dirname(__FILE__)."/MD.apikey";
+}
+
+open( MDAPIKEY , "<$mdAPIkey") or do {print "Didn't find any MoBiDetails APIkey file, expected: ".$mdAPIkey."\n"; $mdAPIkey = "";  } ;
+#checkif file is empty
+if (-z $mdAPIkey){
+	$mdAPIkey = "";
+	print "The MoBiDetails APIkey file: ".$mdAPIkey. " is empty. Please fill it";
+}else{
+	if ($mdAPIkey ne ""){
+		print  STDERR "Processing MDAPIKEY file ... \n" ;
+		while( <MDAPIKEY> ){
+			$md_line = $_;
+			chomp $md_line;
+			if ($md_line eq ""){
+				$mdAPIkey = "";
+			}else{
+				$mdAPIkey = "https://mobidetails.iurc.montp.inserm.fr/MD/api/variant/create_vcf_str?genome_version=".$build."&api_key=".$md_line."&vcf_str=";
+			}
+		}
+	}
+}
+close(MDAPIKEY);
 
 
 
-
-#Hash of 73 ACMG incidentalome genes https://www.ncbi.nlm.nih.gov/clinvar/docs/acmg/
-my %ACMGgene = ("ACTA2" =>1,"ACTC1" =>1,"ACVRL1" =>1,"APC" =>1,"APOB" =>1,"ATP7B" =>1,"BMPR1A" =>1,"BRCA1" =>1,"BRCA2" =>1,"BTD" =>1,"CACNA1S" =>1,"CASQ2" =>1,"COL3A1" =>1,"DSC2" =>1,"DSG2" =>1,"DSP" =>1,"ENG" =>1,"FBN1" =>1,"FLNC" =>1,"GAA" =>1,"GLA" =>1,"HFE" =>1,"HNF1A" =>1,"KCNH2" =>1,"KCNQ1" =>1,"LDLR" =>1,"LMNA" =>1,"MAX" =>1,"MEN1" =>1,"MLH1" =>1,"MSH2" =>1,"MSH6" =>1,"MUTYH" =>1,"MYBPC3" =>1,"MYH11" =>1,"MYH7" =>1,"MYL2" =>1,"MYL3" =>1,"NF2" =>1,"OTC" =>1,"PALB2" =>1,"PCSK9" =>1,"PKP2" =>1,"PMS2" =>1,"PRKAG2" =>1,"PTEN" =>1,"RB1" =>1,"RET" =>1,"RPE65" =>1,"RYR1" =>1,"RYR2" =>1,"SCN5A" =>1,"SDHAF2" =>1,"SDHB" =>1,"SDHC" =>1,"SDHD" =>1,"SMAD3" =>1,"SMAD4" =>1,"STK11" =>1,"TGFBR1" =>1,"TGFBR2" =>1,"TMEM127" =>1,"TMEM43" =>1,"TNNI3" =>1,"TNNT2" =>1,"TP53" =>1,"TPM1" =>1,"TRDN" =>1,"TSC1" =>1,"TSC2" =>1,"TTN" =>1,"VHL" =>1,"WT1"=>1);
-
-
-
-
+#Hash of 81 ACMG incidentalome genes secondary findings SF v3.2 according to  https://www.ncbi.nlm.nih.gov/clinvar/docs/acmg/
+my %ACMGgene = ("ACTA2" =>1,"ACTC1" =>1,"ACVRL1" =>1,"APC" =>1,"APOB" =>1,"ATP7B" =>1,"BAG3" =>1,"BMPR1A" =>1,"BRCA1" =>1,"BRCA2" =>1,"BTD" =>1,"CACNA1S" =>1,"CALM1" =>1,"CALM2" =>1,"CALM3" =>1,"CASQ2" =>1,"COL3A1" =>1,"DES" =>1,"DSC2" =>1,"DSG2" =>1,"DSP" =>1,"ENG" =>1,"FBN1" =>1,"FLNC" =>1,"GAA" =>1,"GLA" =>1,"HFE" =>1,"HNF1A" =>1,"KCNH2" =>1,"KCNQ1" =>1,"LDLR" =>1,"LMNA" =>1,"MAX" =>1,"MEN1" =>1,"MLH1" =>1,"MSH2" =>1,"MSH6" =>1,"MUTYH" =>1,"MYBPC3" =>1,"MYH11" =>1,"MYH7" =>1,"MYL2" =>1,"MYL3" =>1,"NF2" =>1,"OTC" =>1,"PALB2" =>1,"PCSK9" =>1,"PKP2" =>1,"PMS2" =>1,"PRKAG2" =>1,"PTEN" =>1,"RB1" =>1,"RBM20" =>1,"RET" =>1,"RPE65" =>1,"RYR1" =>1,"RYR2" =>1,"SCN5A" =>1,"SDHAF2" =>1,"SDHB" =>1,"SDHC" =>1,"SDHD" =>1,"SMAD3" =>1,"SMAD4" =>1,"STK11" =>1,"TGFBR1" =>1,"TGFBR2" =>1,"TMEM127" =>1,"TMEM43" =>1,"TNNC1" =>1,"TNNI3" =>1,"TNNT2" =>1,"TP53" =>1,"TPM1" =>1,"TRDN" =>1,"TSC1" =>1,"TSC2" =>1,"TTN" =>1,"TTR" =>1,"VHL" =>1,"WT1" =>1);
 
 
 
@@ -913,29 +1029,29 @@ $dicoColumnNbr{'MPA_impact'}=				1;	#+ comment MPA scores and related scores
 $dicoColumnNbr{'Phenolyzer'}=				2;	#Phenolyzer raw score + comment Normalized score
 $dicoColumnNbr{'Gene.'.$refGene}=				3;  #Gene Name + comment LOEUF / Function_description / tissue specificity
 $dicoColumnNbr{'Phenotypes.'.$refGene}=			4;  #OMIM + comment Disease_description
-$dicoColumnNbr{'gnomAD_genome_ALL'}=			5;	#Pop Freq + comment ethny
-$dicoColumnNbr{'gnomAD_exome_ALL'}=			6;	#as well
+$dicoColumnNbr{$gnomadGenomeColumn}=			5;	#Pop Freq + comment ethny
+$dicoColumnNbr{$gnomadExomeColumn}=			6;	#as well
 $dicoColumnNbr{'CLNSIG'}=				7;	#CLinvar
 $dicoColumnNbr{'InterVar_automated'}=			8;	#+ comment ACMG status
 $dicoColumnNbr{'SecondHit-CNV'}=			9;	#TODO
-$dicoColumnNbr{'Func.'.$refGene}=				10;	# + comment ExonicFunc / AAChange / GeneDetail
+#$dicoColumnNbr{'Func.'.$refGene}=				10;	# + comment ExonicFunc / AAChange / GeneDetail
 
 
 
 if (defined $trio){
 
-		$dicoColumnNbr{'Genotype-'.$case}=		11;
-		$dicoColumnNbr{'Genotype-'.$dad}=		12;
-		$dicoColumnNbr{'Genotype-'.$mum}=		13;
+		$dicoColumnNbr{'Genotype-'.$case}=		10;
+		$dicoColumnNbr{'Genotype-'.$dad}=		11;
+		$dicoColumnNbr{'Genotype-'.$mum}=		12;
 
 		$dicoSamples{1}{'columnName'} = 'Genotype-'.$case ;
 		$dicoSamples{2}{'columnName'} = 'Genotype-'.$dad ;
 		$dicoSamples{3}{'columnName'} = 'Genotype-'.$mum ;
 
 		#prepare mozaic colors for each sample at each column position , color is inherit by default
-		$dicoSamples{1}{'columnNbr'} = 11;
-		$dicoSamples{2}{'columnNbr'} = 12;
-		$dicoSamples{3}{'columnNbr'} = 13;
+		$dicoSamples{1}{'columnNbr'} = 10;
+		$dicoSamples{2}{'columnNbr'} = 11;
+		$dicoSamples{3}{'columnNbr'} = 12;
 
 
 		# TODO Add out-of-trio samples, affected samples first then non-affected samples
@@ -946,9 +1062,9 @@ if (defined $trio){
 					if ($j eq $case or $j eq $dad or $j eq $mum){
 						$NTaffectedCmpt--;
 					}else{
-						$dicoColumnNbr{'Genotype-'.$affectedArray[$j]}=		13+$NTaffectedCmpt;
+						$dicoColumnNbr{'Genotype-'.$affectedArray[$j]}=		12+$NTaffectedCmpt;
 						$dicoSamples{3+$NTaffectedCmpt}{'columnName'} = 'Genotype-'.$affectedArray[$j] ;
-						$dicoSamples{3+$NTaffectedCmpt}{'columnNbr'} = 13+$NTaffectedCmpt ;
+						$dicoSamples{3+$NTaffectedCmpt}{'columnNbr'} = 12+$NTaffectedCmpt ;
 
 					}
 				}
@@ -956,9 +1072,9 @@ if (defined $trio){
 
 			if ( scalar  @nonAffectedArray > 0){
 				for( my $k = 0 ; $k < scalar @nonAffectedArray; $k++){
-					$dicoColumnNbr{'Genotype-'.$nonAffectedArray[$k]}=		14+$NTaffectedCmpt+$k;
+					$dicoColumnNbr{'Genotype-'.$nonAffectedArray[$k]}=		13+$NTaffectedCmpt+$k;
 					$dicoSamples{4+$NTaffectedCmpt+$k}{'columnName'} = 'Genotype-'.$nonAffectedArray[$k] ;
-					$dicoSamples{4+$NTaffectedCmpt+$k}{'columnNbr'} = 14+$NTaffectedCmpt+$k ;
+					$dicoSamples{4+$NTaffectedCmpt+$k}{'columnNbr'} = 13+$NTaffectedCmpt+$k ;
 					$NTnonAffectedCmpt++;
 				}
 			}
@@ -973,38 +1089,38 @@ if (defined $trio){
 	if ( scalar  @affectedArray > 0){
 			for( my $j = 0 ; $j < scalar @affectedArray; $j++){
 				$NTaffectedCmpt++;
-				$dicoColumnNbr{'Genotype-'.$affectedArray[$j]}=		11+$j;
+				$dicoColumnNbr{'Genotype-'.$affectedArray[$j]}=		10+$j;
 				$dicoSamples{$j+1}{'columnName'} = 'Genotype-'.$affectedArray[$j] ;
-				$dicoSamples{$j+1}{'columnNbr'} = 11+$j ;
+				$dicoSamples{$j+1}{'columnNbr'} = 10+$j ;
 			}
 			if ( scalar  @nonAffectedArray > 0){
 				for( my $k = 0 ; $k < scalar @nonAffectedArray; $k++){
-					$dicoColumnNbr{'Genotype-'.$nonAffectedArray[$k]}=		11+$NTaffectedCmpt+$k;
+					$dicoColumnNbr{'Genotype-'.$nonAffectedArray[$k]}=		10+$NTaffectedCmpt+$k;
 					$dicoSamples{$NTaffectedCmpt+$k+1}{'columnName'} = 'Genotype-'.$nonAffectedArray[$k] ;
-					$dicoSamples{$NTaffectedCmpt+$k+1}{'columnNbr'} = 11+$NTaffectedCmpt+$k ;
+					$dicoSamples{$NTaffectedCmpt+$k+1}{'columnNbr'} = 10+$NTaffectedCmpt+$k ;
 					$NTnonAffectedCmpt++;
 				}
 			}
 	}else{
 			for( my $i = 0 ; $i < scalar @sampleList; $i++){
 
-				$dicoColumnNbr{'Genotype-'.$sampleList[$i]}=			11+$i;	# + comment qual / caller / DP AD AB
+				$dicoColumnNbr{'Genotype-'.$sampleList[$i]}=			10+$i;	# + comment qual / caller / DP AD AB
 				$dicoSamples{$i+1}{'columnName'} = 'Genotype-'.$sampleList[$i] ;
-				$dicoSamples{$i+1}{'columnNbr'} = 11+$i ;
+				$dicoSamples{$i+1}{'columnNbr'} = 10+$i ;
 			}
 	}
 }
 
 
-$dicoColumnNbr{'#CHROM'}=	11+$cmpt ;
-$dicoColumnNbr{'POS'}=		12+$cmpt ;
-$dicoColumnNbr{'ID'}=		13+$cmpt ;
-$dicoColumnNbr{'REF'}=		14+$cmpt ;
-$dicoColumnNbr{'ALT'}=		15+$cmpt ;
-$dicoColumnNbr{'FILTER'}=	16+$cmpt ;
+$dicoColumnNbr{'#CHROMPOSREFALT'}=	10+$cmpt ;
+#$dicoColumnNbr{'POS'}=		12+$cmpt ;
+#$dicoColumnNbr{'ID'}=		13+$cmpt ;
+#$dicoColumnNbr{'REF'}=		14+$cmpt ;
+#$dicoColumnNbr{'ALT'}=		15+$cmpt ;
+$dicoColumnNbr{'FILTER'}=	11+$cmpt ;
 
 #Add custom Info in additionnal columns
-my $lastColumn = 17+$cmpt;
+my $lastColumn = 12+$cmpt;
 
 # add case depth
 if($case ne "" && defined $addCaseDepth){
@@ -1068,6 +1184,9 @@ foreach my $key  (sort { $dicoColumnNbr{$a} <=> $dicoColumnNbr{$b} } keys %dicoC
 	push @columnTitles,  $key;
 	#DEBUG print STDERR $key."\n";
 }
+# fix gnomAD column names	
+$columnTitles[5] = "gnomAD_Genome";
+$columnTitles[6] = "gnomAD_Exome";
 
 
 #final strings for comment
@@ -1109,7 +1228,11 @@ my @CommentMPA_score = ("MPA_ranking",
 
 my $pLI_Comment = "pLI - the probability of being loss-of-function intolerant (intolerant of both heterozygous and homozygous lof variants)\npRec - the probability of being intolerant of homozygous, but not heterozygous lof variants\npNull - the probability of being tolerant of both heterozygous and homozygous lof variants";
 
-my @CommentGnomadGenome = ('gnomAD_genome_ALL',
+my @CommentGnomadGenome;
+if ($gnomadGenome_names ne ""){
+	@CommentGnomadGenome = @gnomadGenome_List;
+}else{
+	@CommentGnomadGenome = ('gnomAD_genome_ALL',
                            'gnomAD_genome_AFR',
                            'gnomAD_genome_AMR',
                            'gnomAD_genome_ASJ',
@@ -1117,19 +1240,22 @@ my @CommentGnomadGenome = ('gnomAD_genome_ALL',
                            'gnomAD_genome_FIN',
                            'gnomAD_genome_NFE',
                            'gnomAD_genome_OTH');
+}
 
-
-
-
-
-my @CommentGnomadExome = ('gnomAD_exome_ALL',
+my @CommentGnomadExome;
+if ($gnomadExome_names ne ""){
+	@CommentGnomadExome = @gnomadExome_List;
+}else{
+	@CommentGnomadExome = ('gnomAD_exome_ALL',
                           'gnomAD_exome_AFR',
                           'gnomAD_exome_AMR',
                           'gnomAD_exome_ASJ',
                           'gnomAD_exome_EAS',
                           'gnomAD_exome_FIN',
                           'gnomAD_exome_NFE',
-                          'gnomAD_exome_OTH');
+                          'gnomAD_exome_OTH',
+			  'gnomAD_exome_SAS');
+}
 
 
 my %CommentInterVar = (
@@ -1168,9 +1294,11 @@ check the genes whether are for mutilfactor disorder. The reviewers suggeset to 
 );
 
 
-my @CommentFunc = ( 	'ExonicFunc.'.$refGene,
+my @CommentFunc = (	'ExonicFunc.'.$refGene,
 			'AAChange.'.$refGene,
-			'GeneDetail.'.$refGene);
+			'GeneDetail.'.$refGene, 
+			'ID',
+			'Func.'.$refGene);
 
 
 my @CommentPhenotype = ( 'Disease_description.'.$refGene);
@@ -1184,6 +1312,7 @@ my @CommentClinvar = (	'CLNREVSTAT',
 #For HTML tooltip output
 my %commentHash;
 $commentHash{'0'}='commentMPAscore';
+$commentHash{'1'}='commentFunc';
 $commentHash{'2'}='commentPhenolyzer';
 $commentHash{'3'}='commentpLI';
 $commentHash{'4'}='commentPhenotype';
@@ -1191,7 +1320,6 @@ $commentHash{'5'}='commentGnomADgenome';
 $commentHash{'6'}='commentGnomADexome';
 $commentHash{'7'}='commentClinvar';
 $commentHash{'8'}='commentInterVar';
-$commentHash{'10'}='commentFunc';
 $commentHash{'11'}='commentGenotype';
 
 
@@ -1287,7 +1415,7 @@ while( <VCF> ){
 	@line = split( /\t/, $current_line );
 
 	#DEBUG print STDERR $dicoColumnNbr{'Gene.'.$refGene}."\n";
-
+ 
 
 
 #############################################
@@ -1342,11 +1470,11 @@ while( <VCF> ){
 		#DEBUG		print $current_line,"\n";
 
 		#filling output line with classical first vcf columns
-		$finalSortData[$dicoColumnNbr{'#CHROM'}]=	$line[0];
-		$finalSortData[$dicoColumnNbr{'POS'}]=		$line[1];
-		$finalSortData[$dicoColumnNbr{'ID'}]=		$line[2];
-		$finalSortData[$dicoColumnNbr{'REF'}]=		$line[3];
-		$finalSortData[$dicoColumnNbr{'ALT'}]=		$line[4];
+		$finalSortData[$dicoColumnNbr{'#CHROMPOSREFALT'}]=	$line[0]."-".$line[1]."-".$line[3]."-".$line[4];
+		#$finalSortData[$dicoColumnNbr{'POS'}]=		$line[1];
+		#$finalSortData[$dicoColumnNbr{'ID'}]=		$line[2];
+		#$finalSortData[$dicoColumnNbr{'REF'}]=		$line[3];
+		#$finalSortData[$dicoColumnNbr{'ALT'}]=		$line[4];
 		$finalSortData[$dicoColumnNbr{'FILTER'}]=	$line[6];
 
 
@@ -1371,6 +1499,11 @@ while( <VCF> ){
 				#print $infoKeyValue[1]."\n";
 			}
 		}
+		
+		# add ID and FILTER to the dicoInfo
+		$dicoInfo{'ID'} = $line[2];
+		$dicoInfo{'FILTER'} = $line[6];
+
 
 #DEBUG
 #print Dumper(\%dicoInfo);
@@ -1407,20 +1540,21 @@ while( <VCF> ){
 
 		#select only x% pop freq
 		#Use pop freq threshold as an input parameter (default = 1%)
-		next if(( $dicoInfo{'gnomAD_genome_ALL'} ne ".") && ($dicoInfo{'gnomAD_genome_ALL'} > $popFreqThr));
+		next if(( $dicoInfo{$gnomadGenomeColumn} ne ".") && ($dicoInfo{$gnomadGenomeColumn} > $popFreqThr));
 
 		#convert gnomad freq "." to zero
-		if( $dicoInfo{'gnomAD_genome_ALL'} eq "."){
-			$dicoInfo{'gnomAD_genome_ALL'} = 0;
+		if( $dicoInfo{$gnomadGenomeColumn} eq "."){
+			$dicoInfo{$gnomadGenomeColumn} = 0;
 		}
-		if( $dicoInfo{'gnomAD_exome_ALL'} eq "."){
-			$dicoInfo{'gnomAD_exome_ALL'} = 0;
+		if( $dicoInfo{$gnomadExomeColumn} eq "."){
+			$dicoInfo{$gnomadExomeColumn} = 0;
 		}
 
 		#FILTERING according to newHope option and filterList option
 		$filterBool = 0;
 
-		switch ($finalSortData[$dicoColumnNbr{'FILTER'}]){
+		#switch ($finalSortData[$dicoColumnNbr{'FILTER'}]){
+		switch ($dicoInfo{'FILTER'}){
 			case (\@filterArray) {$filterBool=0}
 			else {$filterBool=1}
 		}
@@ -1466,13 +1600,12 @@ while( <VCF> ){
 				#print "dicoInfo\t".$dicoInfo{$keys}."\n";
 				#print "keys\t".$keys."\n";
 			}else{
-				#check if custom INFO exists in VCF
-				if($dicoColumnNbr{$keys} > (16+$cmpt)){
+				#check if custom INFO exists in VCF or gnomad_genome or gnomad_exome names
+				if($dicoColumnNbr{$keys} > (16+$cmpt) || $dicoColumnNbr{$keys} == 5 || $dicoColumnNbr{$keys} == 6 ){
 					$finalSortData[$dicoColumnNbr{$keys}] = "INFO not found";
 				}
 			}
 		}
-
 
 
 		#split multiple gene names
@@ -1481,6 +1614,29 @@ while( <VCF> ){
 		#uniq genes names
 		@geneList = do { my %seen; grep { !$seen{$_}++ } @geneListTemp };
 
+		#reset gene name
+		$finalSortData[$dicoColumnNbr{'Gene.'.$refGene}] = "";
+        
+		#uniq gene name in output
+		foreach my $geneName (@geneList){
+			$finalSortData[$dicoColumnNbr{'Gene.'.$refGene}] .= $geneName.";";
+			
+			#try to rescue OMIM annotation in multiple gene lines
+			if (scalar @geneListTemp > 1){
+				if (defined $dicoInfo{'Phenotypes.'.$refGene} ){
+					if ($dicoInfo{'Phenotypes.'.$refGene} eq "." ){
+						if (defined $genemap2_variant{$geneName} ){
+							if ( $genemap2_variant{$geneName} ne ""){
+								$finalSortData[$dicoColumnNbr{'Phenotypes.'.$refGene}] .=  $genemap2_variant{$geneName}.";";
+								$dicoInfo{'Phenotypes.'.$refGene} .= $genemap2_variant{$geneName}.";";
+							}
+						}
+					}
+				}
+			}
+        }
+        # remove last ";"
+        chop($finalSortData[$dicoColumnNbr{'Gene.'.$refGene}]);
 
 
 		#Phenolyzer Column
@@ -1825,7 +1981,7 @@ while( <VCF> ){
 				$intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}{"seen"} ++ ;
 				
 				if ($dicoInfo{"CLNSIG"} ne  $intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}{"CLNSIG"} ){
-					$finalSortData[$dicoColumnNbr{'intersectVCFannotation'}] .= ";CLNSIG:".$intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}{"CNSIG"}; 
+					$finalSortData[$dicoColumnNbr{'intersectVCFannotation'}] .= ";CLNSIG:".$intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}{"CLNSIG"}; 
 				}	
 				if ($dicoInfo{"Phenotypes.".$refGene} ne  $intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}{"Phenotypes"} ){
 					$finalSortData[$dicoColumnNbr{'intersectVCFannotation'}] .= ";Phenotypes:".$intersectVCF_variant{$line[0]."_".$line[1]."_".$line[3]."_".$line[4]}{"Phenotypes"}; 
@@ -2055,11 +2211,27 @@ while( <VCF> ){
 ########## additionnal analysis in TRIO or affected context according to family genotype + CNV
 
 
+		#Do next if index case is 0/0 in duo context
+  		if (defined $duo){
+			if ( $line[0]!~/X/){
+
+    				if (defined $skipCaseWT && $finalSortData[$dicoColumnNbr{"Genotype-".$case}] eq "0/0"){
+       					next;
+	   			}
+			}
+		}
+
 		#Penalize (or do next) if index case is 0/0 or parents are 1/1 and not affected. We should treat further all affected genotypes like this (!= 0/0)
 		if (defined $trio){
+			if ($line[0]!~/X/){
 
 			if (defined $skipCaseWT && $finalSortData[$dicoColumnNbr{"Genotype-".$case}] eq "0/0"){
-				next;
+				switch ($familyGenotype){
+					#Check if case/dad and case/mum  inheritance are  consistent
+					case /^_0\/0_0\/1_0\/0_/ {$dadVariant ++ ;}
+					case /^_0\/0_0\/0_0\/1_/ {$mumVariant ++ ;}
+				}
+    				next;
 			}
 
 			switch ($familyGenotype){
@@ -2069,6 +2241,7 @@ while( <VCF> ){
 				case /^_0\/1_0\/1_0\/0_/ {$caseDadVariant ++;}
 				case /^_0\/1_0\/0_0\/1_/ {$caseMumVariant ++;}
 
+			}
 			}
 
 			if ($finalSortData[$dicoColumnNbr{"Genotype-".$case}] eq "0/0" or (! defined $hashAffected{$dad} and $finalSortData[$dicoColumnNbr{"Genotype-".$dad}] eq "1/1") or (! defined $hashAffected{$mum} and $finalSortData[$dicoColumnNbr{"Genotype-".$mum}] eq "1/1") ){
@@ -2249,6 +2422,16 @@ while( <VCF> ){
 		$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'commentPhenotype'} = $commentPhenotype  ;
 		$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'commentClinvar'} = $commentClinvar  ;
 		$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'genotypeMozaic'} = $mozaicSamples ;
+		
+		#deal with URL
+		if ($mdAPIkey ne ""){
+			$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'MDurl'} = $mdAPIkey.$finalSortData[$dicoColumnNbr{'#CHROMPOSREFALT'}];
+		}else{
+			$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'MDurl'} = "https://mobidetails.iurc.montp.inserm.fr/MD/vars/".$finalSortData[$dicoColumnNbr{'Gene.'.$refGene}];
+		}	
+		$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'Franklinurl'} = $franklinURL.$finalSortData[$dicoColumnNbr{'#CHROMPOSREFALT'}]."-".$build;
+		
+
 		# attribute mozaic color
 		foreach my $colNbr (keys %hashColor){
 			$hashFinalSortData{$finalSortData[$dicoColumnNbr{'MPA_ranking'}]}{$variantID}{'hashColor'}{$colNbr} = $hashColor{$colNbr} ;
@@ -2855,6 +3038,7 @@ for( my $fieldNbr = 0 ; $fieldNbr < scalar @{$hashFinalSortData{$rank}{$variant}
 
 	switch ($fieldNbr){
 		case ( 0 ) { $htmlALL .= "\t<td ><div class=\"tooltip\">".$hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."<span class=\"tooltiptext tooltip-bottom\">".$hashFinalSortData{$rank}{$variant}{'commentMPAscore'}."</span></div>"   }
+		case ( 1 ) { $htmlALL .= "\t<td ><div class=\"tooltip\"><a href=\"".$hashFinalSortData{$rank}{$variant}{'MDurl'}."\"target=\"_blank\" rel=\"noopener noreferrer\">".$hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."</a><span class=\"tooltiptext tooltip-bottom\">".$hashFinalSortData{$rank}{$variant}{'commentFunc'}."</span></div> "   }
 		case ( 2 ) { $htmlALL .= "\t<td ><div class=\"tooltip\">".$hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."<span class=\"tooltiptext tooltip-bottom\">".$hashFinalSortData{$rank}{$variant}{'commentPhenolyzer'}."</span></div> "   }
 		case ( 3 ) { $htmlALL .= "\t<td style=\"background-color:".$hashFinalSortData{$rank}{$variant}{'colorpLI'}."\"><div class=\"tooltip\">".$hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."<span class=\"tooltiptext tooltip-bottom\">".$hashFinalSortData{$rank}{$variant}{'commentpLI'}."</span></div>    "   }
 		case ( 4 ) { $htmlALL .= "\t<td ><div class=\"tooltip\">".$hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."<span class=\"tooltiptext tooltip-bottom\">".$hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."\n".$hashFinalSortData{$rank}{$variant}{'commentPhenotype'}."</span></div> "   }
@@ -2862,14 +3046,15 @@ for( my $fieldNbr = 0 ; $fieldNbr < scalar @{$hashFinalSortData{$rank}{$variant}
 		case ( 6 ) { $htmlALL .= "\t<td ><div class=\"tooltip\">".$hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."<span class=\"tooltiptext tooltip-bottom\">".$hashFinalSortData{$rank}{$variant}{'commentGnomADexome'}."</span></div> "   }
 		case ( 7 ) { $htmlALL .= "\t<td ><div class=\"tooltip\">".$hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."<span class=\"tooltiptext tooltip-bottom\">".$hashFinalSortData{$rank}{$variant}{'commentClinvar'}."</span></div> "   }
 		case ( 8 ) { $htmlALL .= "\t<td ><div class=\"tooltip\">".$hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."<span class=\"tooltiptext tooltip-bottom\">".$hashFinalSortData{$rank}{$variant}{'commentInterVar'}."</span></div> "   }
-		case ( 10 ) { $htmlALL .= "\t<td ><div class=\"tooltip\">".$hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."<span class=\"tooltiptext tooltip-bottom\">".$hashFinalSortData{$rank}{$variant}{'commentFunc'}."</span></div> "   }
-		case ( 11 ) {
+		case ( 10 ) {
 			if ( defined $hashFinalSortData{$rank}{$variant}{'hashColor'}{$fieldNbr}){
 				$htmlALL .= "\t<td style=\"background-color:".$hashFinalSortData{$rank}{$variant}{'hashColor'}{$fieldNbr}."\"><div class=\"tooltip\">".$hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."<span class=\"tooltiptext tooltip-bottom\">".$hashFinalSortData{$rank}{$variant}{'commentGenotype'}."</span></div>";
 			}else{
 				$htmlALL .= "\t<td ><div class=\"tooltip\">".$hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."<span class=\"tooltiptext tooltip-bottom\">".$hashFinalSortData{$rank}{$variant}{'commentGenotype'}."</span></div>";
 			}
 		}
+		case ( $dicoColumnNbr{'#CHROMPOSREFALT'} ) { $htmlALL .= "\t<td ><div class=\"tooltip\"><a href=\"".$hashFinalSortData{$rank}{$variant}{'Franklinurl'}."\"target=\"_blank\" rel=\"noopener noreferrer\">".$hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."</a></div> "  ;
+		}	
 		else{
 			if ( defined $hashFinalSortData{$rank}{$variant}{'hashColor'}{$fieldNbr}){
 				$htmlALL .= "\t<td style=\"background-color:".$hashFinalSortData{$rank}{$variant}{'hashColor'}{$fieldNbr}."\"><div class=\"tooltip\">".$hashFinalSortData{$rank}{$variant}{'finalArray'}[$fieldNbr]."</div>";
@@ -2882,6 +3067,7 @@ for( my $fieldNbr = 0 ; $fieldNbr < scalar @{$hashFinalSortData{$rank}{$variant}
 			}
 		}
 	}
+
 
 
 
@@ -3105,27 +3291,47 @@ $worksheetOMIMREC->autofilter('A1:AZ'.$worksheetLineOMIMREC); # Add autofilter u
 
 my $metadataLine = 1;
 
+my $dadRatio = 0;
+my $dadPoolRatio = 0;
+my $mumRatio = 0;
+my $mumPoolRatio = 0;
+
 if(defined $trio){
 
 	$worksheetHTZcompo->autofilter('A1:AZ'.$worksheetLineHTZcompo); # Add autofilter
 	$worksheetSNPdadVsCNVmum->autofilter('A1:AZ'.$worksheetLineSNPdadVsCNVmum); # Add autofilter
 
 
-	#check inheritance consistency and add to METADATA
- 	if ( $dadVariant > 0 && $mumVariant > 0 && $caseDadVariant > 0 && $caseMumVariant > 0){
 
-		if ( log($caseDadVariant/$dadVariant) / log(10) < 0.1 ){
-			$worksheetMETA->write($metadataLine , 0, "Dad status : OK (log10(".$caseDadVariant."/".$dadVariant.") < 0.1), Inherited Heterozygous variants Ratio tends toward 0." );
+	#check inheritance consistency and add to METADATA : log(transmis/nontransmis) between -0.13 and 0.1
+ 	if ( $dadVariant > 0 && $mumVariant > 0 && $caseDadVariant > 0 && $caseMumVariant > 0){
+       
+		#approximative correction of pooled dad and mum number variant by 4 (pool of 4)  
+		$dadRatio = log($caseDadVariant/$dadVariant) / log(10); 
+		$dadPoolRatio = log($caseDadVariant/($dadVariant/4)) / log(10);
+		
+		$mumRatio = log($caseMumVariant/$mumVariant) / log(10); 
+		$mumPoolRatio = log($caseMumVariant/($mumVariant/4)) / log(10);
+	
+		if (  -0.13 < $dadRatio && $dadRatio <= 0.1  ){
+			$worksheetMETA->write($metadataLine , 0, "Dad status : OK ".$dadRatio." [log10(".$caseDadVariant."/".$dadVariant."] is in the range -0.13 to 0.1), log10 of Inherited Heterozygous variants Ratio tends toward 0." );
 		}else{
-			$worksheetMETA->write($metadataLine , 0, "Dad status : BAD (log10(".$caseDadVariant."/".$dadVariant.") > 0.1), Inherited Heterozygous variants Ratio tends toward 0." );
+			$worksheetMETA->write($metadataLine , 0, "Dad status : BAD [log10(".$caseDadVariant."/".$dadVariant."] is out of range -0.13 to 0.1), log10 of Inherited Heterozygous variants Ratio tends toward 0." );
+		}
+		$metadataLine ++;
+		
+		if (  -0.13 <= $dadPoolRatio && $dadPoolRatio <= 0.1  ){
+			$worksheetMETA->write($metadataLine , 0, "Dad Pool status : OK ".$dadPoolRatio." (log10(".$caseDadVariant."/(".$dadVariant."/4)) is in the range -0.13 to 0.1), log10 of Inherited Heterozygous variants Ratio tends toward 0." );
+		}else{
+			$worksheetMETA->write($metadataLine , 0, "Dad Pool status : BAD ". $dadPoolRatio." (log10(".$caseDadVariant."/(".$dadVariant."/4)) is out of range -0.13 to 0.1), log10 of Inherited Heterozygous variants Ratio tends toward 0." );
 		}
 
 		$metadataLine ++;
 
-		if ( log($caseMumVariant/$mumVariant) / log(10) < 0.1 ){
-			$worksheetMETA->write($metadataLine , 0, "Mum status : OK (log10(".$caseMumVariant."/".$mumVariant.") < 0.1), Inherited Heterozygous variants Ratio tends toward 0." );
+		if ( log($caseMumVariant/$mumVariant) / log(10) < 0.1  && log($caseMumVariant/$mumVariant) / log(10) > -0.13 ){
+			$worksheetMETA->write($metadataLine , 0, "Mum status : OK (log10(".$caseMumVariant."/".$mumVariant.") is in the range -0.13 to 0.1), Inherited Heterozygous variants Ratio tends toward 0." );
 		}else{
-			$worksheetMETA->write($metadataLine , 0, "Mum status : BAD (log10(".$caseMumVariant."/".$mumVariant.") > 0.1), Inherited Heterozygous variants Ratio tends toward 0." );
+			$worksheetMETA->write($metadataLine , 0, "Mum status : BAD (log10(".$caseMumVariant."/".$mumVariant.") is out of range -0.13 to 0.1), Inherited Heterozygous variants Ratio tends toward 0." );
 		}
 
 		$metadataLine ++;
@@ -3141,8 +3347,10 @@ $worksheetMETA->write($metadataLine , 0, $achabArg );
 $metadataLine ++;
 
 # write IDSNP
-$worksheetMETA->write( $metadataLine, 0, $hashIDSNP{$finalSortData[$dicoColumnNbr{'ID'}]} );
-$metadataLine ++;
+if (defined $dicoColumnNbr{'ID'}){
+	$worksheetMETA->write( $metadataLine, 0, $hashIDSNP{$finalSortData[$dicoColumnNbr{'ID'}]} );
+	$metadataLine ++;
+}
 
 #write top 100 genes scored by phenolyzer
 if (%phenolyzerGene){
@@ -3167,13 +3375,36 @@ $metadataLine ++;
 $worksheetMETA->write( $metadataLine , 0, $vcfHeader );
 $metadataLine ++;
 
+#intersect evaluation
+$metadataLine ++;
+$metadataLine ++;
+$worksheetMETA->write( $metadataLine, 0, "Intersect VCF evaluation:" );
+$metadataLine ++;
 
+my $seenCounter = 0;
+my $interVcfSize = 0;
+if($intersectVCF_File ne ""){
+	foreach my $var (keys %intersectVCF_variant){
+		if (defined $intersectVCF_variant{$var}{"seen"}){
+			$interVcfSize ++;
+			if ($intersectVCF_variant{$var}{"seen"} > 0){
+				$seenCounter ++;
+			}
+		}	
+	}
+	$worksheetMETA->write( $metadataLine, 0, "Nb variants to intersect (current/intersect): ".$count." / ".$interVcfSize );
+	$metadataLine ++;
+	$worksheetMETA->write( $metadataLine, 0, "Nb intersected variants: ".$seenCounter );
+	$metadataLine ++;
+}
+
+# Add autofilter
 $worksheetSNPmumVsCNVdad->autofilter('A1:AZ'.$worksheetLineSNPmumVsCNVdad); # Add autofilter
 $worksheetAR->autofilter('A1:AZ'.$worksheetLineAR); # Add autofilter
 $worksheetDENOVO->autofilter('A1:AZ'.$worksheetLineDENOVO); # Add autofilter
 
 
-
+# fill Candidates
 if($candidates ne ""){
 	foreach my $patho (keys %candidWorksheetHash){
 		my $toto = $candidWorksheetHash{$patho}{'workbook'};
@@ -3181,7 +3412,7 @@ if($candidates ne ""){
 	 }
  }
 
-
+#hide ACMG tab
 if (defined $hideACMG){
 	$worksheetACMG->hide();
 }
@@ -3231,34 +3462,6 @@ if ($poorCoverage_File ne "" &&  $genemap2_File ne ""  ){
 	$worksheetCoverage->freeze_panes( 1, 0 );    # Freeze the first row
 
 
-	open(GENEMAP2 , "<$genemap2_File") or die("Cannot open poorCoverage file ".$genemap2_File) ;
-	print  STDERR "Processing genemap2 file ... \n" ;
-
-	while( <GENEMAP2> ){
-
-  		$genemap2_Line = $_;
-
-#############################################
-##############   skip header
-		next if ($genemap2_Line=~/^#/);
-
-		chomp $genemap2_Line;
-		@genemap2_List = split( /\t/, $genemap2_Line );
-
-		if (defined $genemap2_List[8]  && $genemap2_List[8] ne ""){
-			if (defined $genemap2_variant{$genemap2_List[8]}){
-				if (! defined $genemap2_List[12]){
-					$genemap2_List[12] = "";
-				}
-
-				$genemap2_variant{$genemap2_List[8]} .= ";".$genemap2_List[12];
-
-			}else{
-				$genemap2_variant{$genemap2_List[8]} = $genemap2_List[12];
-			}
-		}
-	}
-	close(GENEMAP2);
 
 
 	open(POORCOV , "<$poorCoverage_File") or die("Cannot open poorCoverage file ".$poorCoverage_File) ;
@@ -3276,16 +3479,33 @@ if ($poorCoverage_File ne "" &&  $genemap2_File ne ""  ){
 
 		if ($poorCoverage_Line=~/^#/){
 			push @poorCoverage_List, "OMIM";
+   			push @poorCoverage_List, "CANDIDATE";
+      
 		}else{
 
 			#add OMIM phenotypes if exists => Assuming that gene name is in 4th column of poor coverage
 			if (defined $genemap2_variant{$poorCoverage_List[3]}){
-
 				push @poorCoverage_List, $genemap2_variant{$poorCoverage_List[3]} ;
+			}else{
+   				push @poorCoverage_List, "." ;
+      			}
+			
+   			#add CANDIDATES TAG if exists => Assuming that gene name is in 4th column of poor coverage
+   			if($candidates ne ""){
+			
+				if (defined $candidateGene{$poorCoverage_List[3]} ){
+					
+     					$candidateGene{$poorCoverage_List[3]}=~ s/CANDID_//g ;
+					push @poorCoverage_List,  $candidateGene{$poorCoverage_List[3]} ;
 
+				}else{
+					push @poorCoverage_List, "." ;
+				}	
+			
 			}else{
 
 				push @poorCoverage_List, "." ;
+				
 			}
 		}
 
@@ -3359,10 +3579,11 @@ sub writeThisSheet {
 
 			$worksheet->write_row( $worksheetLine, 0, $hashTemp{'finalArray'} );
 			$worksheet->write_comment( $worksheetLine,$hashColumn{'MPA_ranking'},		$hashTemp{'commentMPAscore'} ,x_scale => 2, y_scale => 5 );
-			$worksheet->write_comment( $worksheetLine,$hashColumn{'gnomAD_genome_ALL'},	$hashTemp{'commentGnomADgenome'} ,x_scale => 3, y_scale => 2  );
-			$worksheet->write_comment( $worksheetLine,$hashColumn{'gnomAD_exome_ALL'},	$hashTemp{'commentGnomADexome'} ,x_scale => 3, y_scale => 2  );
+			$worksheet->write_comment( $worksheetLine,$hashColumn{$gnomadGenomeColumn},	$hashTemp{'commentGnomADgenome'} ,x_scale => 3, y_scale => 2  );
+			$worksheet->write_comment( $worksheetLine,$hashColumn{$gnomadExomeColumn},	$hashTemp{'commentGnomADexome'} ,x_scale => 3, y_scale => 2  );
 			$worksheet->write_comment( $worksheetLine,$hashColumn{'Genotype-'.$case},	$hashTemp{'commentGenotype'} ,x_scale => 2, y_scale => $hashTemp{'nbSample'} );
-			$worksheet->write_comment( $worksheetLine,$hashColumn{'Func.'.$refGene},		$hashTemp{'commentFunc'} ,x_scale => 3, y_scale => 3  );
+			$worksheet->write_comment( $worksheetLine,$hashColumn{'MPA_impact'},		$hashTemp{'commentFunc'} ,x_scale => 3, y_scale => 3  );
+			#$worksheet->write_comment( $worksheetLine,$hashColumn{'Func.'.$refGene},		$hashTemp{'commentFunc'} ,x_scale => 3, y_scale => 3  );
 
 			#DEBUG print commentGenotype in CHROM cells
 			#$worksheet->write_comment( $worksheetLine,$hashColumn{'#CHROM'},	$hashTemp{'commentGenotype'} ,x_scale => 2, y_scale => $hashTemp{'nbSample'} );
@@ -3408,6 +3629,10 @@ sub writeThisSheet {
 					#$worksheet->write( $worksheetLine,$hashColumn{$sampleMozaic}  , $hashTemp{'finalArray'}[$hashColumn{$sampleMozaic}] ,$format_pLI );
 				}
 			}
+			# write URL  Mobidetails and franklin
+			$worksheet->write( $worksheetLine,  $hashColumn{'MPA_impact'}  ,  $hashTemp{'MDurl'} , undef ,  $hashTemp{'finalArray'}[$hashColumn{'MPA_impact'}])  ;
+			$worksheet->write( $worksheetLine,  $hashColumn{'#CHROMPOSREFALT'}  ,  $hashTemp{'Franklinurl'} , undef ,  $hashTemp{'finalArray'}[$hashColumn{'#CHROMPOSREFALT'}])  ;
+
 
 }#END OF SUB
 
